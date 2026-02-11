@@ -1,7 +1,8 @@
 import Image from "next/image";
+import LandingPage from "./dashboard/page";
 
 export default function Home() {
   return (
-    <h1>hello world</h1>
+    <LandingPage />
   );
 }
