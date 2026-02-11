@@ -10,7 +10,7 @@ export const Navbar = () => {
             <div className="w-10 h-10 bg-[#FD366E] rounded-xl flex items-center justify-center transform group-hover:rotate-12 transition-transform duration-300 shadow-[0_0_20px_rgba(253,54,110,0.4)]">
               <div className="w-5 h-5 bg-white rounded-full opacity-90" />
             </div>
-            <span className="font-black text-2xl tracking-tighter text-white">CAAW</span>
+            <span className="font-black text-2xl tracking-tighter text-white">Approva</span>
           </div>
 
           {/* Desktop Navigation */}
