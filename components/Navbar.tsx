@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 
 export const Navbar = () => {
   return (
@@ -22,7 +23,7 @@ export const Navbar = () => {
 
           {/* CTA Buttons */}
           <div className="flex items-center gap-6">
-            <button className="hidden sm:block text-zinc-400 hover:text-white text-sm font-bold transition-colors">Sign In</button>
+            <Link href="/login" className="hidden sm:block text-zinc-400 hover:text-white text-sm font-bold transition-colors">Sign In</Link>
             <button className="bg-[#FD366E] hover:bg-[#ff4d7e] text-white px-6 py-2.5 rounded-full text-sm font-black transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(253,54,110,0.3)]">
               Get Started
             </button>

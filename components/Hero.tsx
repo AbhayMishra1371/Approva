@@ -1,4 +1,4 @@
-import React from 'react';
+import Link from 'next/link';
 import { ArrowRight, Play, CheckCircle2, Users, MessageSquare } from 'lucide-react';
 
 export const Hero = () => {
@@ -27,10 +27,10 @@ export const Hero = () => {
               The only platform that prioritizes your speed. Pure black, pure performance, and glowing results.
             </p>
             <div className="flex flex-col sm:flex-row gap-6">
-              <button className="bg-[#FD366E] hover:bg-[#ff4d7e] text-white px-10 py-5 rounded-2xl font-black text-lg transition-all shadow-[0_20px_40px_rgba(253,54,110,0.2)] flex items-center justify-center gap-3 group hover:-translate-y-1">
+              <Link href="/login" className="bg-[#FD366E] hover:bg-[#ff4d7e] text-white px-10 py-5 rounded-2xl font-black text-lg transition-all shadow-[0_20px_40px_rgba(253,54,110,0.2)] flex items-center justify-center gap-3 group hover:-translate-y-1">
                 Start Now
                 <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-              </button>
+              </Link>
               <button className="bg-white/5 hover:bg-white/10 text-white border border-[#FD366E]/30 px-10 py-5 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-3 hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(253,54,110,0.1)]">
                 <Play className="w-6 h-6 fill-[#FD366E] text-[#FD366E]" />
                 Full Demo

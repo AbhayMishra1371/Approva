@@ -1,4 +1,4 @@
-import React from 'react';
+import Link from 'next/link';
 
 export const CTA = () => {
   return (
@@ -16,9 +16,9 @@ export const CTA = () => {
                   Scale your creative production to infinity and beyond. Pure black background, glowing results.
               </p>
               <div className="flex flex-col sm:flex-row gap-8 justify-center relative z-10">
-                  <button className="bg-[#FD366E] text-white px-12 py-6 rounded-[2rem] font-black text-xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(253,54,110,0.4)]">
+                  <Link href="/login" className="bg-[#FD366E] text-white px-12 py-6 rounded-[2rem] font-black text-xl hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(253,54,110,0.4)]">
                       Launch Workspace
-                  </button>
+                  </Link>
                   <button className="bg-white/5 text-white border border-[#FD366E]/30 px-12 py-6 rounded-[2rem] font-black text-xl hover:bg-white/10 transition-all backdrop-blur-md">
                       Request Access
                   </button>
