@@ -1,0 +1,45 @@
+import { createBrowserClient } from "@/lib/appwrite/client";
+import { ID } from "appwrite";
+
+export const signUp = async (email: string, password: string) => {
+    const { account } = createBrowserClient();
+    try {
+        const user = await account.create(ID.unique(), email, password);
+        return { user, error: null };
+    } catch (error: any) {
+        console.error("SignUp Error:", error?.message || error);
+        return { user: null, error };
+    }
+};
+
+export const login = async (email: string, password: string) => {
+    const { account } = createBrowserClient();
+    try {
+        const session = await account.createEmailPasswordSession(email, password);
+        const user = await account.get();
+        return { user, session, error: null };
+    } catch (error: any) {
+        console.error("Login Error:", error?.message || error);
+        return { user: null, session: null, error };
+    }
+};
+
+export const getUser = async () => {
+    const { account } = createBrowserClient();
+    try {
+        const user = await account.get();
+        return user;
+    } catch (error: any) {
+        console.error("GetUser Error:", error?.message || error);
+        return null;
+    }
+};
+
+export const logout = async () => {
+    const { account } = createBrowserClient();
+    try {
+        await account.deleteSession("current");
+    } catch (error: any) {
+        console.error("Logout Error:", error?.message || error);
+    }
+};

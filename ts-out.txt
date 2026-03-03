@@ -1,0 +1,1 @@
+src/components/projects/AssetUpload.tsx(6,26): error TS2307: Cannot find module '@/lib/supabase/client' or its corresponding type declarations.
