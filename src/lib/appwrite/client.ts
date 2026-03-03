@@ -1,3 +1,4 @@
+"use client"
 import { Client, Account, Databases, Storage } from 'appwrite';
 
 export const createBrowserClient = () => {

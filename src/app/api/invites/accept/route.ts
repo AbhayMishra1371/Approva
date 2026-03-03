@@ -64,7 +64,8 @@ export async function POST(request: Request) {
             {
                 project_id: inviteObj.project_id,
                 user_id: user.$id,
-                role: inviteObj.role
+                role: inviteObj.role,
+
             }
         );
 
