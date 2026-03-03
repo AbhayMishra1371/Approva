@@ -108,8 +108,8 @@ export async function POST(
                 file_type: fileType || 'unknown',
                 size: size || 0,
                 status: "draft",
-                version: "v1"
-                // `url` might be needed here later for storage if public
+                version: "v1",
+                url: url || ""
             }
         );
 

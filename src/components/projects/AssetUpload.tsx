@@ -80,7 +80,6 @@ export function AssetUpload({ projectId, onUploadSuccess }: AssetUploadProps) {
                     file_type: file.type,
                     size: file.size,
                     url: publicUrl,
-                    user_id: user.$id,
                     version: "v1",
                     status: "Pending"
                 }

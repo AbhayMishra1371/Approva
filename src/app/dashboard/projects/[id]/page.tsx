@@ -43,6 +43,7 @@ type Asset = {
     created_at: string;
     version: string;
     status: string;
+    url: string;
 };
 
 export default function ProjectDetailPage() {
