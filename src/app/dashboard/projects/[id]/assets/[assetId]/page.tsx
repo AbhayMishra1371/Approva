@@ -113,37 +113,18 @@ export default function AssetDetailPage() {
         }
     };
 
-    const handleAddAnnotation = async (newAnn: Omit<Annotation, 'created_at' | 'status'>) => {
-        try {
-            const { databases } = createBrowserClient();
-            const doc = await databases.createDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                annotationsCollectionId,
-                ID.unique(),
-                {
-                    asset_id: assetId,
-                    x: newAnn.x,
-                    y: newAnn.y,
-                    width: newAnn.width,
-                    height: newAnn.height,
-                    status: 'pending'
-                }
-            );
+    const handleAddAnnotation = (newAnn: Omit<Annotation, 'created_at' | 'status'>) => {
+        const tempId = `temp-${ID.unique()}`;
+        const added: Annotation = {
+            $id: tempId,
+            ...newAnn,
+            status: 'pending',
+            created_at: new Date().toISOString()
+        };
 
-            const added: Annotation = {
-                $id: doc.$id,
-                ...newAnn,
-                status: 'pending',
-                created_at: new Date().toISOString()
-            };
-
-            setAnnotations([...annotations, added]);
-            setSelectedAnnotation(added);
-            setComments([]); // New annotation has no comments
-        } catch (e) {
-            console.error("Failed to save annotation:", e);
-            alert("Failed to save annotation. Make sure the 'annotations' collection exists in Appwrite.");
-        }
+        setAnnotations([...annotations, added]);
+        setSelectedAnnotation(added);
+        setComments([]); // New annotation has no comments
     };
 
     const handleAddComment = async (text: string) => {
@@ -152,13 +133,44 @@ export default function AssetDetailPage() {
         try {
             const { databases, account } = createBrowserClient();
             const user = await account.get();
+            let finalAnnotationId = selectedAnnotation.$id;
+
+            // If it's a temporary annotation, save it first
+            if (selectedAnnotation.$id.startsWith('temp-')) {
+                try {
+                    const doc = await databases.createDocument(
+                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                        annotationsCollectionId,
+                        ID.unique(),
+                        {
+                            asset_id: assetId,
+                            x: selectedAnnotation.x,
+                            y: selectedAnnotation.y,
+                            width: selectedAnnotation.width,
+                            height: selectedAnnotation.height,
+                            status: 'pending'
+                        }
+                    );
+                    finalAnnotationId = doc.$id;
+
+                    // Update local annotations state replace temp with real ID
+                    setAnnotations(annotations.map(a =>
+                        a.$id === selectedAnnotation.$id ? { ...a, $id: doc.$id } : a
+                    ));
+                    setSelectedAnnotation({ ...selectedAnnotation, $id: doc.$id });
+                } catch (e) {
+                    console.error("Failed to save annotation:", e);
+                    alert("Failed to save annotation. Make sure the 'annotations' collection exists.");
+                    return;
+                }
+            }
 
             const doc = await databases.createDocument(
                 process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                 commentsCollectionId,
                 ID.unique(),
                 {
-                    annotation_id: selectedAnnotation.$id,
+                    annotation_id: finalAnnotationId,
                     user_id: user.$id,
                     user_email: user.email,
                     text: text
@@ -174,7 +186,7 @@ export default function AssetDetailPage() {
             }]);
         } catch (e) {
             console.error("Failed to save comment:", e);
-            alert("Failed to save comment. Make sure the 'comments' collection exists in Appwrite.");
+            alert("Failed to save comment.");
         }
     };
 
@@ -201,6 +213,12 @@ export default function AssetDetailPage() {
 
     const handleDeleteAnnotation = async () => {
         if (!selectedAnnotation?.$id) return;
+
+        if (selectedAnnotation.$id.startsWith('temp-')) {
+            setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
+            setSelectedAnnotation(null);
+            return;
+        }
 
         try {
             const { databases } = createBrowserClient();
@@ -302,8 +320,16 @@ export default function AssetDetailPage() {
                             annotations={annotations}
                             onAddAnnotation={handleAddAnnotation}
                             onSelectAnnotation={(ann) => {
+                                // Clean up temp annotation if switching away
+                                if (selectedAnnotation?.$id?.startsWith('temp-') && selectedAnnotation.$id !== ann.$id) {
+                                    setAnnotations(prev => prev.filter(a => a.$id !== selectedAnnotation.$id));
+                                }
                                 setSelectedAnnotation(ann);
-                                fetchComments(ann.$id!);
+                                if (ann.$id && !ann.$id.startsWith('temp-')) {
+                                    fetchComments(ann.$id);
+                                } else {
+                                    setComments([]);
+                                }
                             }}
                             selectedAnnotationId={selectedAnnotation?.$id}
                         />
@@ -322,7 +348,12 @@ export default function AssetDetailPage() {
                         annotationId={selectedAnnotation.$id!}
                         comments={comments}
                         onAddComment={handleAddComment}
-                        onClose={() => setSelectedAnnotation(null)}
+                        onClose={() => {
+                            if (selectedAnnotation.$id?.startsWith('temp-')) {
+                                setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
+                            }
+                            setSelectedAnnotation(null);
+                        }}
                         onResolve={handleResolve}
                         onDelete={handleDeleteAnnotation}
                         status={selectedAnnotation.status}
