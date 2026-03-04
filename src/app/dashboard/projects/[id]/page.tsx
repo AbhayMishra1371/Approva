@@ -17,7 +17,8 @@ import {
     FileText,
     Video,
     FileIcon,
-    Download
+    Download,
+    Maximize2
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 // Removed supabase import
@@ -351,12 +352,22 @@ export default function ProjectDetailPage() {
 
                                                 {/* Hover Actions */}
                                                 <div className="absolute inset-0 bg-[#12131a]/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                                                    <button className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center text-white hover:bg-purple-600 transition-colors shadow-lg">
+                                                    <Link
+                                                        href={`/dashboard/projects/${id}/assets/${asset.id}`}
+                                                        className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center text-white hover:bg-purple-600 transition-colors shadow-lg"
+                                                        title="View & Annotate"
+                                                    >
+                                                        <Maximize2 className="w-5 h-5" />
+                                                    </Link>
+                                                    <button className="w-10 h-10 rounded-full bg-[#1e1f2b] flex items-center justify-center text-white hover:bg-[#2a2b36] transition-colors shadow-lg border border-[#2a2b36]">
                                                         <Download className="w-5 h-5" />
                                                     </button>
                                                     {(role === 'owner' || role === 'admin') && (
                                                         <button
-                                                            onClick={() => handleDeleteAsset(asset.id)}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteAsset(asset.id);
+                                                            }}
                                                             className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-colors shadow-lg"
                                                             title="Delete Asset"
                                                         >
