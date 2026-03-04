@@ -9,6 +9,7 @@ export type Annotation = {
     width: number;
     height: number;
     status: 'pending' | 'resolved';
+    color: string;
     created_at: string;
 };
 
@@ -19,6 +20,7 @@ interface AnnotationCanvasProps {
     onAddAnnotation: (annotation: Omit<Annotation, 'created_at' | 'status'>) => void;
     onSelectAnnotation: (annotation: Annotation) => void;
     selectedAnnotationId?: string;
+    currentColor: string; // The color currently selected for new annotations
 }
 
 export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
@@ -27,7 +29,8 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     annotations,
     onAddAnnotation,
     onSelectAnnotation,
-    selectedAnnotationId
+    selectedAnnotationId,
+    currentColor
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -72,7 +75,10 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         // Require a minimum size (e.g., 0.5% of the container) to prevent accidental clicks
         const MIN_SIZE = 0.5;
         if (currentRect.width > MIN_SIZE && currentRect.height > MIN_SIZE) {
-            onAddAnnotation(currentRect);
+            onAddAnnotation({
+                ...currentRect,
+                color: currentColor
+            });
         }
 
         setCurrentRect(null);
@@ -121,18 +127,23 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
                             width={ann.width}
                             height={ann.height}
                             fill={selectedAnnotationId === ann.$id
-                                ? (ann.status === 'resolved' ? 'rgba(148, 163, 184, 0.2)' : 'rgba(168, 85, 247, 0.3)')
+                                ? (ann.status === 'resolved' ? 'rgba(148, 163, 184, 0.2)' : `${ann.color}40`)
                                 : 'transparent'}
-                            stroke={ann.status === 'resolved' ? '#94a3b8' : '#a855f7'}
+                            stroke={ann.status === 'resolved' ? '#94a3b8' : ann.color}
                             strokeWidth="0.5"
-                            className={`transition-all hover:fill-[rgba(168,85,247,0.15)] ${selectedAnnotationId === ann.$id ? 'stroke-[1.2] drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]' : 'hover:stroke-[0.8]'}`}
+                            className={`transition-all hover:fill-[${ann.color}20] ${selectedAnnotationId === ann.$id ? 'stroke-[1.2] drop-shadow-[0_0_8px_rgba(168,85,247,0.3)]' : 'hover:stroke-[0.8]'}`}
+                            style={{
+                                fill: selectedAnnotationId === ann.$id
+                                    ? (ann.status === 'resolved' ? 'rgba(148, 163, 184, 0.2)' : `${ann.color}4D`)
+                                    : undefined
+                            }}
                         />
                         {ann.status === 'pending' && (
                             <circle
                                 cx={ann.x}
                                 cy={ann.y}
                                 r="0.8"
-                                fill="#a855f7"
+                                fill={ann.color}
                                 className="animate-pulse"
                             />
                         )}
@@ -146,8 +157,8 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
                         y={currentRect.y}
                         width={currentRect.width}
                         height={currentRect.height}
-                        fill="rgba(168, 85, 247, 0.2)"
-                        stroke="#a855f7"
+                        fill={`${currentColor}33`}
+                        stroke={currentColor}
                         strokeWidth="0.5"
                         strokeDasharray="1,1"
                     />

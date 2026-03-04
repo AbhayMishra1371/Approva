@@ -39,6 +39,15 @@ export default function AssetDetailPage() {
     const [comments, setComments] = useState<Comment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [userEmail, setUserEmail] = useState<string>("");
+    const [currentColor, setCurrentColor] = useState("#a855f7");
+
+    const colors = [
+        { name: 'Purple', value: '#a855f7' },
+        { name: 'Cyan', value: '#06b6d4' },
+        { name: 'Emerald', value: '#10b981' },
+        { name: 'Amber', value: '#f59e0b' },
+        { name: 'Rose', value: '#f43f5e' }
+    ];
 
     // Appwrite Collection IDs (Fallback to standard names if not in env)
     const annotationsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ANNOTATIONS_ID || 'annotations';
@@ -76,6 +85,7 @@ export default function AssetDetailPage() {
                         width: doc.width,
                         height: doc.height,
                         status: doc.status,
+                        color: doc.color || '#a855f7',
                         created_at: doc.$createdAt
                     })));
                 } catch (e) {
@@ -148,7 +158,8 @@ export default function AssetDetailPage() {
                             y: selectedAnnotation.y,
                             width: selectedAnnotation.width,
                             height: selectedAnnotation.height,
-                            status: 'pending'
+                            status: 'pending',
+                            color: selectedAnnotation.color
                         }
                     );
                     finalAnnotationId = doc.$id;
@@ -298,15 +309,33 @@ export default function AssetDetailPage() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <button className="flex items-center gap-2 bg-[#1e1f2b] hover:bg-[#2a2b36] border border-[#2a2b36] text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
-                        <Download className="w-3.5 h-3.5 text-purple-400" />
-                        Download
-                    </button>
-                    <button className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        Approve Asset
-                    </button>
+                <div className="flex items-center gap-6">
+                    {/* Color Palette */}
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-[#12131a] rounded-lg border border-[#1f202b]">
+                        <span className="text-[10px] text-slate-500 font-medium mr-1 uppercase tracking-wider">Color</span>
+                        <div className="flex items-center gap-1.5">
+                            {colors.map((color) => (
+                                <button
+                                    key={color.value}
+                                    onClick={() => setCurrentColor(color.value)}
+                                    className={`w-4 h-4 rounded-full transition-all ${currentColor === color.value ? 'ring-2 ring-offset-2 ring-offset-[#12131a] ring-white scale-110' : 'hover:scale-110'}`}
+                                    style={{ backgroundColor: color.value }}
+                                    title={color.name}
+                                />
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button className="flex items-center gap-2 bg-[#1e1f2b] hover:bg-[#2a2b36] border border-[#2a2b36] text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
+                            <Download className="w-3.5 h-3.5 text-purple-400" />
+                            Download
+                        </button>
+                        <button className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Approve Asset
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -332,6 +361,7 @@ export default function AssetDetailPage() {
                                 }
                             }}
                             selectedAnnotationId={selectedAnnotation?.$id}
+                            currentColor={currentColor}
                         />
 
                         {/* Overlay Tip */}
