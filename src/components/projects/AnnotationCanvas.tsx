@@ -69,15 +69,9 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
 
         setIsDrawing(false);
 
-        // If the rect is too small, consider it a single click/pin of default size
-        if (currentRect.width < 1 && currentRect.height < 1) {
-            onAddAnnotation({
-                x: currentRect.x - 2,
-                y: currentRect.y - 2,
-                width: 4,
-                height: 4
-            });
-        } else {
+        // Require a minimum size (e.g., 0.5% of the container) to prevent accidental clicks
+        const MIN_SIZE = 0.5;
+        if (currentRect.width > MIN_SIZE && currentRect.height > MIN_SIZE) {
             onAddAnnotation(currentRect);
         }
 
