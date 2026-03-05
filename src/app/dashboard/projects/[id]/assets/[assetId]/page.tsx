@@ -137,6 +137,7 @@ export default function AssetDetailPage() {
         setComments([]); // New annotation has no comments
     };
 
+
     const handleAddComment = async (text: string) => {
         if (!selectedAnnotation?.$id) return;
 
@@ -262,9 +263,26 @@ export default function AssetDetailPage() {
 
             setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
             setSelectedAnnotation(null);
+            setComments([]); // Clear comments
         } catch (e) {
             console.error("Failed to delete annotation:", e);
             alert("Failed to delete annotation.");
+        }
+    };
+
+    const handleDeleteComment = async (commentId: string) => {
+        try {
+            const { databases } = createBrowserClient();
+            await databases.deleteDocument(
+                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                commentsCollectionId,
+                commentId
+            );
+
+            setComments(comments.filter(c => c.$id !== commentId));
+        } catch (e) {
+            console.error("Failed to delete comment:", e);
+            alert("Failed to delete comment.");
         }
     };
 
@@ -386,6 +404,7 @@ export default function AssetDetailPage() {
                         }}
                         onResolve={handleResolve}
                         onDelete={handleDeleteAnnotation}
+                        onDeleteComment={handleDeleteComment}
                         status={selectedAnnotation.status}
                     />
                 ) : (

@@ -18,6 +18,7 @@ interface CommentThreadProps {
     onClose: () => void;
     onResolve: () => void;
     onDelete: () => void;
+    onDeleteComment: (commentId: string) => void;
     status: 'pending' | 'resolved';
 }
 
@@ -28,6 +29,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     onClose,
     onResolve,
     onDelete,
+    onDeleteComment,
     status
 }) => {
     const [newComment, setNewComment] = useState("");
@@ -83,18 +85,31 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                     </div>
                 ) : (
                     comments.map((comment) => (
-                        <div key={comment.$id} className="flex gap-3">
+                        <div key={comment.$id} className="flex gap-3 group">
                             <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
                                 <User className="w-4 h-4 text-purple-400" />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs font-bold text-white truncate max-w-[120px]">
-                                        {comment.user_email.split('@')[0]}
-                                    </span>
-                                    <span className="text-[10px] text-slate-500">
-                                        {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-white truncate max-w-[120px]">
+                                            {comment.user_email.split('@')[0]}
+                                        </span>
+                                        <span className="text-[10px] text-slate-500">
+                                            {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (confirm("Delete this comment?")) {
+                                                onDeleteComment(comment.$id);
+                                            }
+                                        }}
+                                        className="p-1 hover:bg-rose-500/10 text-rose-500 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                        title="Delete Comment"
+                                    >
+                                        <Trash2 className="w-3 h-3" />
+                                    </button>
                                 </div>
                                 <div className="bg-[#12131a] rounded-xl p-3 text-sm text-slate-300 break-words border border-[#2a2b36]">
                                     {comment.text}
