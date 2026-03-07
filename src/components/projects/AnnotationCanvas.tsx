@@ -263,7 +263,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
                         >
                             <div style={{ transform: `scale(${1 / scale})`, transformOrigin: 'top left' }}>
                                 {/* Pin Marker */}
-                                <div className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+                                <div className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group/pin">
                                     <div
                                         className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-xl border-[2px] transition-transform ${selectedAnnotationId === ann.$id ? 'border-white scale-125' : 'border-[#12131a] hover:scale-110'}`}
                                         style={{ backgroundColor: ann.color || currentColor }}
@@ -271,7 +271,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
                                         {index + 1}
                                     </div>
                                     {ann.name && selectedAnnotationId !== ann.$id && (
-                                        <div className="mt-1.5 px-2 py-0.5 bg-black/80 backdrop-blur-md rounded-md text-white text-[10px] whitespace-nowrap border border-white/10 shadow-lg pointer-events-none">
+                                        <div className="mt-1.5 px-2 py-0.5 bg-black/80 backdrop-blur-md rounded-md text-white text-[10px] whitespace-nowrap border border-white/10 shadow-lg pointer-events-none opacity-0 group-hover/pin:opacity-100 transition-opacity duration-200">
                                             {ann.name}
                                         </div>
                                     )}
