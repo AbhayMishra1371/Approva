@@ -124,18 +124,41 @@ export default function AssetDetailPage() {
         }
     };
 
-    const handleAddAnnotation = (newAnn: Omit<Annotation, 'created_at' | 'status'>) => {
-        const tempId = `temp-${ID.unique()}`;
-        const added: Annotation = {
-            $id: tempId,
-            ...newAnn,
-            status: 'pending',
-            created_at: new Date().toISOString()
-        };
+    const handleAddAnnotation = async (newAnn: Omit<Annotation, 'created_at' | 'status'>) => {
+        try {
+            const { databases } = createBrowserClient();
 
-        setAnnotations([...annotations, added]);
-        setSelectedAnnotation(added);
-        setComments([]); // New annotation has no comments
+            // Immediately save the annotation to Appwrite
+            const doc = await databases.createDocument(
+                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                annotationsCollectionId,
+                ID.unique(),
+                {
+                    asset_id: assetId,
+                    name: newAnn.name || undefined,
+                    x: newAnn.x,
+                    y: newAnn.y,
+                    width: newAnn.width,
+                    height: newAnn.height,
+                    status: 'pending',
+                    color: newAnn.color
+                }
+            );
+
+            const added: Annotation = {
+                $id: doc.$id,
+                ...newAnn,
+                status: 'pending',
+                created_at: doc.$createdAt
+            };
+
+            setAnnotations([...annotations, added]);
+            setSelectedAnnotation(added);
+            setComments([]); // New annotation has no comments
+        } catch (error) {
+            console.error("Failed to save annotation:", error);
+            alert("Failed to save annotation. Make sure the 'annotations' collection exists.");
+        }
     };
 
 
@@ -145,46 +168,13 @@ export default function AssetDetailPage() {
         try {
             const { databases, account } = createBrowserClient();
             const user = await account.get();
-            let finalAnnotationId = selectedAnnotation.$id;
-
-            // If it's a temporary annotation, save it first
-            if (selectedAnnotation.$id.startsWith('temp-')) {
-                try {
-                    const doc = await databases.createDocument(
-                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                        annotationsCollectionId,
-                        ID.unique(),
-                        {
-                            asset_id: assetId,
-                            name: selectedAnnotation.name || undefined,
-                            x: selectedAnnotation.x,
-                            y: selectedAnnotation.y,
-                            width: selectedAnnotation.width,
-                            height: selectedAnnotation.height,
-                            status: 'pending',
-                            color: selectedAnnotation.color
-                        }
-                    );
-                    finalAnnotationId = doc.$id;
-
-                    // Update local annotations state replace temp with real ID
-                    setAnnotations(annotations.map(a =>
-                        a.$id === selectedAnnotation.$id ? { ...a, $id: doc.$id } : a
-                    ));
-                    setSelectedAnnotation({ ...selectedAnnotation, $id: doc.$id });
-                } catch (e) {
-                    console.error("Failed to save annotation:", e);
-                    alert("Failed to save annotation. Make sure the 'annotations' collection exists.");
-                    return;
-                }
-            }
 
             const doc = await databases.createDocument(
                 process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                 commentsCollectionId,
                 ID.unique(),
                 {
-                    annotation_id: finalAnnotationId,
+                    annotation_id: selectedAnnotation.$id,
                     user_id: user.$id,
                     user_email: user.email,
                     text: text
@@ -227,12 +217,6 @@ export default function AssetDetailPage() {
 
     const handleDeleteAnnotation = async () => {
         if (!selectedAnnotation?.$id) return;
-
-        if (selectedAnnotation.$id.startsWith('temp-')) {
-            setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
-            setSelectedAnnotation(null);
-            return;
-        }
 
         try {
             const { databases } = createBrowserClient();
@@ -369,19 +353,26 @@ export default function AssetDetailPage() {
                             annotations={annotations}
                             onAddAnnotation={handleAddAnnotation}
                             onSelectAnnotation={(ann) => {
-                                // Clean up temp annotation if switching away
-                                if (selectedAnnotation?.$id?.startsWith('temp-') && selectedAnnotation.$id !== ann.$id) {
-                                    setAnnotations(prev => prev.filter(a => a.$id !== selectedAnnotation.$id));
-                                }
                                 setSelectedAnnotation(ann);
-                                if (ann.$id && !ann.$id.startsWith('temp-')) {
+                                if (ann.$id) {
                                     fetchComments(ann.$id);
-                                } else {
-                                    setComments([]);
                                 }
                             }}
                             selectedAnnotationId={selectedAnnotation?.$id}
                             currentColor={currentColor}
+                            renderPopup={(ann) => (
+                                <CommentThread
+                                    annotationId={ann.$id!}
+                                    annotationName={ann.name}
+                                    comments={comments}
+                                    onAddComment={handleAddComment}
+                                    onClose={() => setSelectedAnnotation(null)}
+                                    onResolve={handleResolve}
+                                    onDelete={handleDeleteAnnotation}
+                                    onDeleteComment={handleDeleteComment}
+                                    status={ann.status}
+                                />
+                            )}
                         />
 
                         {/* Overlay Tip */}
@@ -392,63 +383,50 @@ export default function AssetDetailPage() {
                     </div>
                 </div>
 
-                {/* Info / Comment Sidebar */}
-                {selectedAnnotation ? (
-                    <CommentThread
-                        annotationId={selectedAnnotation.$id!}
-                        annotationName={selectedAnnotation.name}
-                        comments={comments}
-                        onAddComment={handleAddComment}
-                        onClose={() => {
-                            if (selectedAnnotation.$id?.startsWith('temp-')) {
-                                setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
-                            }
-                            setSelectedAnnotation(null);
-                        }}
-                        onResolve={handleResolve}
-                        onDelete={handleDeleteAnnotation}
-                        onDeleteComment={handleDeleteComment}
-                        status={selectedAnnotation.status}
-                    />
-                ) : (
-                    <div className="w-80 bg-[#12131a] border-l border-[#1f202b] p-6 flex flex-col animate-in slide-in-from-right duration-300">
-                        <h3 className="text-white font-bold text-sm mb-6 flex items-center gap-2">
-                            <Info className="w-4 h-4 text-purple-400" /> Asset Info
-                        </h3>
-                        <div className="space-y-6">
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Status</label>
-                                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
-                                    <Clock className="w-3 h-3" />
-                                    Pending Review
-                                </span>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Details</label>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs">
-                                        <span className="text-slate-400">File Type</span>
-                                        <span className="text-white">{asset.file_type.split('/')[1].toUpperCase()}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs">
-                                        <span className="text-slate-400">Size</span>
-                                        <span className="text-white">{(asset.size / 1024 / 1024).toFixed(2)} MB</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs">
-                                        <span className="text-slate-400">Owner</span>
-                                        <span className="text-white">Invision Studio</span>
-                                    </div>
+                {/* Info / Comment Sidebar (Always visible) */}
+                <div className="w-80 bg-[#12131a] border-l border-[#1f202b] p-6 flex flex-col z-20">
+                    <h3 className="text-white font-bold text-sm mb-6 flex items-center gap-2">
+                        <Info className="w-4 h-4 text-purple-400" /> Asset Info
+                    </h3>
+                    <div className="space-y-6">
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Status</label>
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
+                                <Clock className="w-3 h-3" />
+                                Pending Review
+                            </span>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Details</label>
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-400">File Type</span>
+                                    <span className="text-white">{asset.file_type.split('/')[1].toUpperCase()}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-400">Size</span>
+                                    <span className="text-white">{(asset.size / 1024 / 1024).toFixed(2)} MB</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-400">Owner</span>
+                                    <span className="text-white">Invision Studio</span>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="pt-6 border-t border-[#1f202b]">
+                        <div className="pt-6 border-t border-[#1f202b]">
+                            {selectedAnnotation ? (
                                 <p className="text-[10px] text-slate-500 leading-relaxed italic">
-                                    Select an annotation on the image to view comments and start a discussion.
+                                    Annotation {selectedAnnotation.name ? `"${selectedAnnotation.name}"` : 'selected'}. View and reply to comments on the canvas popup.
                                 </p>
-                            </div>
+                            ) : (
+                                <p className="text-[10px] text-slate-500 leading-relaxed italic">
+                                    Select an annotation pin on the image to view comments and start a discussion.
+                                </p>
+                            )}
                         </div>
                     </div>
-                )}
+                </div>
             </main>
         </div>
     );

@@ -44,7 +44,11 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#1e1f2b] border-l border-[#2a2b36] w-80 animate-in slide-in-from-right duration-300">
+        <div
+            className="flex flex-col bg-[#1e1f2b]/95 backdrop-blur-xl border border-[#2a2b36] w-80 max-h-[450px] rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+        >
             <div className="p-4 border-b border-[#2a2b36] flex items-center justify-between">
                 <h3 className="text-white font-bold text-sm">{annotationName || 'Annotation Thread'}</h3>
                 <div className="flex items-center gap-2">

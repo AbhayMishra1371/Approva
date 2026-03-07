@@ -22,7 +22,8 @@ interface AnnotationCanvasProps {
     onAddAnnotation: (annotation: Omit<Annotation, 'created_at' | 'status'>) => void;
     onSelectAnnotation: (annotation: Annotation) => void;
     selectedAnnotationId?: string;
-    currentColor: string; // The color currently selected for new annotations
+    currentColor: string;
+    renderPopup?: (annotation: Annotation) => React.ReactNode;
 }
 
 export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
@@ -32,15 +33,18 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     onAddAnnotation,
     onSelectAnnotation,
     selectedAnnotationId,
-    currentColor
+    currentColor,
+    renderPopup
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const innerRef = useRef<HTMLDivElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [startPos, setStartPos] = useState({ x: 0, y: 0 });
     const [currentRect, setCurrentRect] = useState<{ x: number, y: number, width: number, height: number } | null>(null);
+    const [draftPin, setDraftPin] = useState<{ x: number, y: number } | null>(null);
+    const [draftName, setDraftName] = useState("New Annotation");
 
-    // Zoom & Pan State
+
     const [mode, setMode] = useState<'annotate' | 'pan'>('annotate');
     const [scale, setScale] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -62,23 +66,65 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         }
     }, []);
 
+    const getCoordinatesFromEvent = (e: React.MouseEvent): { x: number, y: number } | null => {
+        if (!innerRef.current) return null;
+
+        const container = innerRef.current;
+        const rect = container.getBoundingClientRect();
+
+        let actualLeft = rect.left;
+        let actualTop = rect.top;
+        let actualWidth = rect.width;
+        let actualHeight = rect.height;
+
+
+        const img = container.querySelector('img');
+        if (img) {
+            const imgRatio = img.naturalWidth / img.naturalHeight;
+            const containerRatio = rect.width / rect.height;
+
+            if (imgRatio > containerRatio) {
+
+                actualHeight = rect.width / imgRatio;
+                actualTop = rect.top + (rect.height - actualHeight) / 2;
+            } else {
+
+                actualWidth = rect.height * imgRatio;
+                actualLeft = rect.left + (rect.width - actualWidth) / 2;
+            }
+        }
+
+
+        if (e.clientX < actualLeft || e.clientX > actualLeft + actualWidth ||
+            e.clientY < actualTop || e.clientY > actualTop + actualHeight) {
+            return null;
+        }
+
+        const x = ((e.clientX - actualLeft) / actualWidth) * 100;
+        const y = ((e.clientY - actualTop) / actualHeight) * 100;
+
+        return { x, y };
+    };
+
     const handleMouseDown = (e: React.MouseEvent) => {
+        if (draftPin) {
+            // Dismiss draft pin if clicking outside
+            setDraftPin(null);
+            return;
+        }
+
         if (mode === 'pan') {
             setIsPanning(true);
             setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
             return;
         }
 
-        if (!innerRef.current) return;
-
-        // Use innerRef to get precise coordinates relative to the scaled/panned content
-        const rect = innerRef.current.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) / rect.width) * 100;
-        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        const coords = getCoordinatesFromEvent(e);
+        if (!coords) return;
 
         setIsDrawing(true);
-        setStartPos({ x, y });
-        setCurrentRect({ x, y, width: 0, height: 0 });
+        setStartPos(coords);
+        setCurrentRect({ ...coords, width: 0, height: 0 });
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
@@ -90,44 +136,43 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
             return;
         }
 
-        if (!isDrawing || !innerRef.current) return;
+        if (!isDrawing) return;
 
-        const rect = innerRef.current.getBoundingClientRect();
-        const currentX = ((e.clientX - rect.left) / rect.width) * 100;
-        const currentY = ((e.clientY - rect.top) / rect.height) * 100;
+        const coords = getCoordinatesFromEvent(e);
+        if (!coords) return;
 
-        const width = currentX - startPos.x;
-        const height = currentY - startPos.y;
+        const width = coords.x - startPos.x;
+        const height = coords.y - startPos.y;
 
         setCurrentRect({
-            x: width < 0 ? currentX : startPos.x,
-            y: height < 0 ? currentY : startPos.y,
+            x: width < 0 ? coords.x : startPos.x,
+            y: height < 0 ? coords.y : startPos.y,
             width: Math.abs(width),
             height: Math.abs(height)
         });
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: React.MouseEvent) => {
         if (mode === 'pan') {
             setIsPanning(false);
             return;
         }
 
-        if (!isDrawing || !currentRect) return;
-
+        if (!isDrawing) return;
         setIsDrawing(false);
 
-        // Require a minimum size (e.g., 0.5% of the container) to prevent accidental clicks
-        const MIN_SIZE = 0.5;
-        if (currentRect.width > MIN_SIZE && currentRect.height > MIN_SIZE) {
-            const annotationName = window.prompt("Enter a name for this annotation:", "New Annotation");
-            if (annotationName !== null && annotationName.trim() !== "") {
-                onAddAnnotation({
-                    ...currentRect,
-                    name: annotationName.trim(),
-                    color: currentColor
-                });
-            }
+        const coords = getCoordinatesFromEvent(e);
+        if (!coords) {
+            setCurrentRect(null);
+            return;
+        }
+
+        // If distance moved is very small, treat as a click to place a pin
+        const distance = Math.sqrt(Math.pow(coords.x - startPos.x, 2) + Math.pow(coords.y - startPos.y, 2));
+
+        if (distance < 2) {
+            setDraftPin(startPos);
+            setDraftName("New Annotation");
         }
 
         setCurrentRect(null);
@@ -201,78 +246,119 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
                     />
                 )}
 
-                <svg
-                    className="absolute inset-0 w-full h-full pointer-events-none"
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                >
-                    {/* Existing Annotations */}
+                {/* HTML Annotations Overlay */}
+                <div className="absolute inset-0 w-full h-full pointer-events-none">
                     {annotations.map((ann, index) => (
-                        <g
+                        <div
                             key={ann.$id || index}
-                            className={`pointer-events-auto ${mode === 'annotate' ? 'cursor-pointer' : ''}`}
+                            className={`absolute pointer-events-auto ${mode === 'annotate' ? 'cursor-pointer' : ''}`}
+                            style={{ left: `${ann.x}%`, top: `${ann.y}%`, zIndex: selectedAnnotationId === ann.$id ? 50 : 10 }}
                             onClick={(e) => {
                                 if (mode === 'pan') return;
                                 e.stopPropagation();
                                 onSelectAnnotation(ann);
                             }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onMouseUp={(e) => e.stopPropagation()}
                         >
-                            <rect
-                                x={ann.x}
-                                y={ann.y}
-                                width={ann.width}
-                                height={ann.height}
-                                fill={selectedAnnotationId === ann.$id
-                                    ? (ann.status === 'resolved' ? 'rgba(148, 163, 184, 0.2)' : `${ann.color}40`)
-                                    : 'transparent'}
-                                stroke={ann.status === 'resolved' ? '#94a3b8' : ann.color}
-                                strokeWidth={0.5 / scale} // Keep stroke width visually consistent
-                                className={`transition-all hover:fill-[${ann.color}20] ${selectedAnnotationId === ann.$id ? 'stroke-[1.2] drop-shadow-[0_0_8px_rgba(168,85,247,0.3)]' : 'hover:stroke-[0.8]'}`}
-                                style={{
-                                    strokeWidth: (selectedAnnotationId === ann.$id ? 1.2 : 0.5) / scale,
-                                    fill: selectedAnnotationId === ann.$id
-                                        ? (ann.status === 'resolved' ? 'rgba(148, 163, 184, 0.2)' : `${ann.color}4D`)
-                                        : undefined
-                                }}
-                            />
-                            {ann.name && (
-                                <text
-                                    x={ann.x}
-                                    y={ann.y - (1.5 / scale)}
-                                    fill={ann.status === 'resolved' ? '#94a3b8' : ann.color}
-                                    fontSize={`${2.5 / scale}px`}
-                                    fontWeight="bold"
-                                    className="pointer-events-none drop-shadow-md select-none opacity-90"
-                                >
-                                    {ann.name}
-                                </text>
-                            )}
-                            {ann.status === 'pending' && (
-                                <circle
-                                    cx={ann.x}
-                                    cy={ann.y}
-                                    r={0.8 / scale} // Keep pulse circle size visually consistent
-                                    fill={ann.color}
-                                    className="animate-pulse"
-                                />
-                            )}
-                        </g>
+                            <div style={{ transform: `scale(${1 / scale})`, transformOrigin: 'top left' }}>
+                                {/* Pin Marker */}
+                                <div className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+                                    <div
+                                        className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-xl border-[2px] transition-transform ${selectedAnnotationId === ann.$id ? 'border-white scale-125' : 'border-[#12131a] hover:scale-110'}`}
+                                        style={{ backgroundColor: ann.color || currentColor }}
+                                    >
+                                        {index + 1}
+                                    </div>
+                                    {ann.name && selectedAnnotationId !== ann.$id && (
+                                        <div className="mt-1.5 px-2 py-0.5 bg-black/80 backdrop-blur-md rounded-md text-white text-[10px] whitespace-nowrap border border-white/10 shadow-lg pointer-events-none">
+                                            {ann.name}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Popover */}
+                                {selectedAnnotationId === ann.$id && renderPopup && (
+                                    <div className="absolute top-1/2 -translate-y-1/2 left-full ml-4 z-[100]">
+                                        {renderPopup(ann)}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     ))}
 
-                    {/* Current Drawing */}
-                    {currentRect && mode === 'annotate' && (
-                        <rect
-                            x={currentRect.x}
-                            y={currentRect.y}
-                            width={currentRect.width}
-                            height={currentRect.height}
-                            fill={`${currentColor}33`}
-                            stroke={currentColor}
-                            strokeWidth={0.5 / scale}
-                            strokeDasharray="1,1"
-                        />
+                    {/* Draft Pin Overlay */}
+                    {draftPin && (
+                        <div
+                            className="absolute pointer-events-auto"
+                            style={{ left: `${draftPin.x}%`, top: `${draftPin.y}%`, zIndex: 60 }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onMouseUp={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div style={{ transform: `scale(${1 / scale})`, transformOrigin: 'top left' }}>
+                                {/* Pin Marker */}
+                                <div className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+                                    <div
+                                        className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-xl border-[2px] border-white scale-125 transition-transform"
+                                        style={{ backgroundColor: currentColor }}
+                                    >
+                                        +
+                                    </div>
+                                </div>
+
+                                {/* Naming Popover */}
+                                <div className="absolute top-1/2 -translate-y-1/2 left-full ml-4 z-[100]">
+                                    <div className="bg-[#1e1f2b]/95 backdrop-blur-xl border border-[#2a2b36] p-3 rounded-xl shadow-2xl w-64 animate-in fade-in zoom-in-95 duration-200">
+                                        <label className="text-xs font-bold text-slate-400 mb-2 block uppercase tracking-wider">Name annotation</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                autoFocus
+                                                type="text"
+                                                value={draftName}
+                                                onChange={(e) => setDraftName(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && draftName.trim()) {
+                                                        onAddAnnotation({
+                                                            x: draftPin.x,
+                                                            y: draftPin.y,
+                                                            width: 0,
+                                                            height: 0,
+                                                            name: draftName.trim(),
+                                                            color: currentColor
+                                                        });
+                                                        setDraftPin(null);
+                                                    } else if (e.key === 'Escape') {
+                                                        setDraftPin(null);
+                                                    }
+                                                }}
+                                                className="flex-1 min-w-0 bg-[#12131a] border border-[#2a2b36] rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    if (draftName.trim()) {
+                                                        onAddAnnotation({
+                                                            x: draftPin.x,
+                                                            y: draftPin.y,
+                                                            width: 0,
+                                                            height: 0,
+                                                            name: draftName.trim(),
+                                                            color: currentColor
+                                                        });
+                                                        setDraftPin(null);
+                                                    }
+                                                }}
+                                                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                                            >
+                                                Save
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     )}
-                </svg>
+                </div>
             </div>
         </div>
     );
