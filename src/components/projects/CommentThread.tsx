@@ -20,6 +20,7 @@ interface CommentThreadProps {
     onDelete: () => void;
     onDeleteComment: (commentId: string) => void;
     status: 'pending' | 'resolved';
+    annotationName?: string;
 }
 
 export const CommentThread: React.FC<CommentThreadProps> = ({
@@ -30,7 +31,8 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     onResolve,
     onDelete,
     onDeleteComment,
-    status
+    status,
+    annotationName
 }) => {
     const [newComment, setNewComment] = useState("");
 
@@ -44,7 +46,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     return (
         <div className="flex flex-col h-full bg-[#1e1f2b] border-l border-[#2a2b36] w-80 animate-in slide-in-from-right duration-300">
             <div className="p-4 border-b border-[#2a2b36] flex items-center justify-between">
-                <h3 className="text-white font-bold text-sm">Annotation Thread</h3>
+                <h3 className="text-white font-bold text-sm">{annotationName || 'Annotation Thread'}</h3>
                 <div className="flex items-center gap-2">
                     {status === 'pending' && (
                         <button

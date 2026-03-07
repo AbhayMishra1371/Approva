@@ -85,6 +85,7 @@ export default function AssetDetailPage() {
                         width: doc.width,
                         height: doc.height,
                         status: doc.status,
+                        name: doc.name || undefined,
                         color: doc.color || '#a855f7',
                         created_at: doc.$createdAt
                     })));
@@ -155,6 +156,7 @@ export default function AssetDetailPage() {
                         ID.unique(),
                         {
                             asset_id: assetId,
+                            name: selectedAnnotation.name || undefined,
                             x: selectedAnnotation.x,
                             y: selectedAnnotation.y,
                             width: selectedAnnotation.width,
@@ -394,6 +396,7 @@ export default function AssetDetailPage() {
                 {selectedAnnotation ? (
                     <CommentThread
                         annotationId={selectedAnnotation.$id!}
+                        annotationName={selectedAnnotation.name}
                         comments={comments}
                         onAddComment={handleAddComment}
                         onClose={() => {

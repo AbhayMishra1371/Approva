@@ -5,6 +5,7 @@ import { ZoomIn, ZoomOut, Maximize, MousePointer2, Crosshair } from 'lucide-reac
 
 export type Annotation = {
     $id?: string;
+    name?: string;
     x: number;
     y: number;
     width: number;
@@ -119,10 +120,14 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         // Require a minimum size (e.g., 0.5% of the container) to prevent accidental clicks
         const MIN_SIZE = 0.5;
         if (currentRect.width > MIN_SIZE && currentRect.height > MIN_SIZE) {
-            onAddAnnotation({
-                ...currentRect,
-                color: currentColor
-            });
+            const annotationName = window.prompt("Enter a name for this annotation:", "New Annotation");
+            if (annotationName !== null && annotationName.trim() !== "") {
+                onAddAnnotation({
+                    ...currentRect,
+                    name: annotationName.trim(),
+                    color: currentColor
+                });
+            }
         }
 
         setCurrentRect(null);
@@ -230,6 +235,18 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
                                         : undefined
                                 }}
                             />
+                            {ann.name && (
+                                <text
+                                    x={ann.x}
+                                    y={ann.y - (1.5 / scale)}
+                                    fill={ann.status === 'resolved' ? '#94a3b8' : ann.color}
+                                    fontSize={`${2.5 / scale}px`}
+                                    fontWeight="bold"
+                                    className="pointer-events-none drop-shadow-md select-none opacity-90"
+                                >
+                                    {ann.name}
+                                </text>
+                            )}
                             {ann.status === 'pending' && (
                                 <circle
                                     cx={ann.x}
