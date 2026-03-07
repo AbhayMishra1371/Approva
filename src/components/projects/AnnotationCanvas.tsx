@@ -335,6 +335,12 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
                                                 className="flex-1 min-w-0 bg-[#12131a] border border-[#2a2b36] rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors"
                                             />
                                             <button
+                                                onClick={() => setDraftPin(null)}
+                                                className="bg-[#2a2b36] hover:bg-[#3f4152] text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
                                                 onClick={() => {
                                                     if (draftName.trim()) {
                                                         onAddAnnotation({
