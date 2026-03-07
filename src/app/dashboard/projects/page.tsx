@@ -50,7 +50,7 @@ export default function ProjectsPage() {
             const data = response.documents.map((doc: any) => ({ ...doc, id: doc.$id }));
             setProjects(data);
         } catch (err) {
-            console.error(err);
+            console.error("Error fetching projects:", err instanceof Error ? err.message : err);
         } finally {
             setIsLoading(false);
         }
@@ -261,7 +261,7 @@ function CreateProjectModal({
 
             onSuccess({ ...project, id: project.$id } as any);
         } catch (err) {
-            console.error(err);
+            console.error("Error creating project:", err instanceof Error ? err.message : err);
         } finally {
             setIsSubmitting(false);
         }

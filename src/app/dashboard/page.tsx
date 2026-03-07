@@ -141,7 +141,7 @@ export default function DashboardPage() {
                 alert(data.error || "Failed to accept invite");
             }
         } catch (err) {
-            console.error(err);
+            console.error("Dashboard Assets Fetch Error:", err instanceof Error ? err.message : err);
             alert("An error occurred while accepting");
         } finally {
             setIsAccepting(null);

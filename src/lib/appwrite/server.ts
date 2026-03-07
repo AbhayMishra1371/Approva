@@ -7,14 +7,18 @@ export async function createSessionClient() {
         .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT!)
         .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!);
 
-    const requestHeaders = await headers();
-    const authHeader = requestHeaders.get('authorization');
+    try {
+        const requestHeaders = await headers();
+        const authHeader = requestHeaders.get('authorization');
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-        const jwt = authHeader.split(' ')[1];
-        client.setJWT(jwt);
-    } else {
-        console.warn("No Appwrite Authorization header found in server.ts");
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const jwt = authHeader.split(' ')[1];
+            client.setJWT(jwt);
+        } else {
+            console.warn("No Appwrite Authorization header found. authHeader:", authHeader);
+        }
+    } catch (e) {
+        console.warn("Error accessing headers in server.ts:", e);
     }
 
     return {

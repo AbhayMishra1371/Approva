@@ -216,7 +216,7 @@ export default function ProjectDetailPage() {
                 alert(data.error || "Failed to send invitation.");
             }
         } catch (err) {
-            console.error(err);
+            console.error("Error during project invitation:", err instanceof Error ? err.message : err);
             alert("An error occurred while sending the invitation.");
         } finally {
             setIsInviting(false);
@@ -563,7 +563,7 @@ function CollaboratorsTab({ projectId, currentRole }: { projectId: string; curre
                     console.error("Error fetching collaborators");
                 }
             } catch (err) {
-                console.error(err);
+                console.error("Error fetching collaborators block:", err instanceof Error ? err.message : err);
             } finally {
                 setIsLoading(false);
             }

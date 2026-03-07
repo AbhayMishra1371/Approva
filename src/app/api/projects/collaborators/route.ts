@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
 import { ID, Query } from "node-appwrite";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { render } from "@react-email/render";
 import ProjectInviteEmail from "@/emails/ProjectInviteEmail";
+import * as React from "react";
 
-const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy");
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: parseInt(process.env.SMTP_PORT || "587"),
+  secure: process.env.SMTP_SECURE === "true",
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
 
 export const dynamic = "force-dynamic";
 
@@ -97,43 +106,58 @@ export async function POST(request: Request) {
       }
     );
 
-    /* Send email via Resend */
-    if (
-      process.env.RESEND_API_KEY &&
-      process.env.RESEND_API_KEY.startsWith("re_")
-    ) {
+    /* Send email via Nodemailer */
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
       try {
-        const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-        const inviteLink = `${origin}/dashboard`;
+        // Use NEXT_PUBLIC_APP_URL first, fallback to origin, then localhost
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000";
+        const inviteLink = `${baseUrl}/dashboard`;
 
-        const { data, error } = await resend.emails.send({
-          from: "Approva <onboarding@resend.dev>",
-          to: email,
-          subject: `You've been invited to collaborate on ${project.name}`,
-          react: ProjectInviteEmail({
+        let targetEmail = email;
+        const testMatch = email.match(/\+(.*?)@/); // test+user@gmail.com test case
+        if (process.env.SMTP_USER === "test@example.com") {
+          console.log("Mock Environment");
+        }
+
+        // Add verification to check if SMTP connection works before trying to send
+        try {
+          await transporter.verify();
+          console.log("SMTP Connection verified successfully");
+        } catch (verifyError) {
+          console.error("SMTP Connection Failed. Please check your .env.local credentials:", verifyError);
+          throw verifyError;
+        }
+
+        const emailHtml = await render(
+          React.createElement(ProjectInviteEmail, {
             inviterEmail: user.email || "Someone",
             targetEmail: email,
             projectName: project.name || "a project",
             role,
             inviteLink: inviteLink,
-          }) as React.ReactElement,
+          })
+        );
+
+        const info = await transporter.sendMail({
+          from: process.env.SMTP_FROM || '"Approva" <noreply@approva.com>',
+          to: email,
+          subject: `You've been invited to collaborate on ${project.name}`,
+          html: emailHtml,
         });
 
-        if (error) {
-          console.error("Resend Error:", error);
-        } else {
-          console.log("Email sent successfully:", data?.id);
-        }
-      } catch (err) {
-        console.error("Email send failed:", err);
+        console.log("Email sent successfully! Message ID:", info.messageId);
+        console.log("Accepted domains:", info.accepted);
+        console.log("Rejected domains:", info.rejected);
+      } catch (err: any) {
+        console.error("Email send failed:", err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err);
       }
     } else {
-      console.log("Skipping email. Invalid RESEND_API_KEY.");
+      console.log("Skipping email. Missing SMTP configuration.");
     }
 
     return NextResponse.json({ ...invite, id: invite.$id });
   } catch (error: any) {
-    console.error("Collaborator POST Error:", error?.message || error);
+    console.error("Collaborator POST Error:", error instanceof Error ? { message: error.message, stack: error.stack } : error);
     return NextResponse.json(
       { error: error?.message || "Internal Server Error" },
       { status: 500 }

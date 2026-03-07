@@ -101,7 +101,7 @@ export function AssetUpload({ projectId, onUploadSuccess }: AssetUploadProps) {
             }, 3000);
 
         } catch (err: any) {
-            console.error(err);
+            console.error("Asset Upload Error:", err instanceof Error ? err.message : err);
             setError(err.message || "An unexpected error occurred.");
             setProgress(0);
         } finally {
