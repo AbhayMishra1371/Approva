@@ -9,7 +9,11 @@ import {
     Maximize2,
     Clock,
     CheckCircle,
-    Info
+    Info,
+    SquareSquare,
+    User,
+    ListFilter,
+    Send
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query, ID } from "appwrite";
@@ -27,6 +31,14 @@ type Asset = {
     url: string;
 };
 
+export type GeneralComment = {
+    $id: string;
+    user_id: string;
+    user_email: string;
+    text: string;
+    created_at: string;
+};
+
 export default function AssetDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -40,6 +52,12 @@ export default function AssetDetailPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [userEmail, setUserEmail] = useState<string>("");
     const [currentColor, setCurrentColor] = useState("#a855f7");
+    const [activeSidebarTab, setActiveSidebarTab] = useState<'comments' | 'fields'>('fields');
+
+    // General Comments States
+    const [generalComments, setGeneralComments] = useState<GeneralComment[]>([]);
+    const [newGeneralComment, setNewGeneralComment] = useState("");
+    const [isSubmittingGeneralComment, setIsSubmittingGeneralComment] = useState(false);
 
     const colors = [
         { name: 'Purple', value: '#a855f7' },
@@ -52,6 +70,7 @@ export default function AssetDetailPage() {
     // Appwrite Collection IDs (Fallback to standard names if not in env)
     const annotationsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ANNOTATIONS_ID || 'annotations';
     const commentsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COMMENTS_ID || 'comments';
+    const generalCommentsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_GENERAL_COMMENTS_ID || 'general_comments';
 
     useEffect(() => {
         const fetchData = async () => {
@@ -91,6 +110,24 @@ export default function AssetDetailPage() {
                     })));
                 } catch (e) {
                     console.warn("Annotations collection might not exist yet. Please create it in Appwrite console.", e);
+                }
+
+                // Fetch General Comments
+                try {
+                    const genCommDocs = await databases.listDocuments(
+                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                        generalCommentsCollectionId,
+                        [Query.equal("asset_id", assetId), Query.orderAsc("$createdAt")]
+                    );
+                    setGeneralComments(genCommDocs.documents.map(doc => ({
+                        $id: doc.$id,
+                        user_id: doc.user_id,
+                        user_email: doc.user_email,
+                        text: doc.text,
+                        created_at: doc.$createdAt
+                    })));
+                } catch (e) {
+                    console.warn("General comments collection might not exist yet.", e);
                 }
 
             } catch (error) {
@@ -272,6 +309,42 @@ export default function AssetDetailPage() {
         }
     };
 
+    const handleSendGeneralComment = async () => {
+        if (!newGeneralComment.trim()) return;
+        setIsSubmittingGeneralComment(true);
+
+        try {
+            const { databases, account } = createBrowserClient();
+            const user = await account.get();
+
+            const doc = await databases.createDocument(
+                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                generalCommentsCollectionId,
+                ID.unique(),
+                {
+                    asset_id: assetId,
+                    user_id: user.$id,
+                    user_email: user.email,
+                    text: newGeneralComment.trim()
+                }
+            );
+
+            setGeneralComments([...generalComments, {
+                $id: doc.$id,
+                user_id: user.$id,
+                user_email: user.email,
+                text: newGeneralComment.trim(),
+                created_at: new Date().toISOString()
+            }]);
+            setNewGeneralComment("");
+        } catch (error) {
+            console.error("Failed to save general comment:", error);
+            alert("Failed to send comment. Ensure the 'general_comments' table is created with attributes 'asset_id', 'user_id', 'user_email', and 'text'.");
+        } finally {
+            setIsSubmittingGeneralComment(false);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-screen bg-[#0b0c10]">
@@ -383,48 +456,208 @@ export default function AssetDetailPage() {
                     </div>
                 </div>
 
-                {/* Info / Comment Sidebar (Always visible) */}
-                <div className="w-80 bg-[#12131a] border-l border-[#1f202b] p-6 flex flex-col z-20">
-                    <h3 className="text-white font-bold text-sm mb-6 flex items-center gap-2">
-                        <Info className="w-4 h-4 text-purple-400" /> Asset Info
-                    </h3>
-                    <div className="space-y-6">
-                        <div>
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Status</label>
-                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
-                                <Clock className="w-3 h-3" />
-                                Pending Review
-                            </span>
+                {/* Enhanced Info / Comment Sidebar */}
+                <div className="w-96 bg-[#1a1b23] border-l border-[#1f202b] flex flex-col z-20 overflow-hidden">
+                    {/* Tabs */}
+                    <div className="flex p-3 bg-[#1a1b23] border-b border-[#252632]">
+                        <div className="flex w-full bg-[#12131a] rounded-lg p-1 border border-[#252632]">
+                            <button
+                                onClick={() => setActiveSidebarTab('comments')}
+                                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${activeSidebarTab === 'comments' ? 'bg-[#252632] text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}
+                            >
+                                Comments
+                            </button>
+                            <button
+                                onClick={() => setActiveSidebarTab('fields')}
+                                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${activeSidebarTab === 'fields' ? 'bg-[#252632] text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}
+                            >
+                                Fields
+                            </button>
                         </div>
-                        <div>
-                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Details</label>
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-slate-400">File Type</span>
-                                    <span className="text-white">{asset.file_type.split('/')[1].toUpperCase()}</span>
+                    </div>
+
+                    {/* Tab Content */}
+                    <div className="flex-1 flex flex-col overflow-hidden p-4 space-y-4">
+                        {activeSidebarTab === 'comments' ? (
+                            <div className="h-full flex flex-col">
+                                <div className="bg-[#2a2b36]/30 p-3 rounded-lg border border-[#2a2b36]/50 mb-4 bg-stripes">
+                                    <h3 className="text-white font-medium text-xs flex items-center gap-1.5 mb-1">
+                                        <Info className="w-3.5 h-3.5 text-purple-400" /> Canvas Annotations
+                                    </h3>
+                                    <p className="text-[10px] text-slate-400 leading-snug">
+                                        Click a pin on the image to view specific canvas comments. Or, leave general feedback below.
+                                    </p>
                                 </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-slate-400">Size</span>
-                                    <span className="text-white">{(asset.size / 1024 / 1024).toFixed(2)} MB</span>
+
+                                <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-1 custom-scrollbar">
+                                    {generalComments.length === 0 ? (
+                                        <div className="text-center py-8 text-slate-500 text-xs italic border border-dashed border-[#2a2b36] rounded-xl relative">
+                                            No general comments yet. Be the first to share your thoughts!
+                                        </div>
+                                    ) : (
+                                        generalComments.map(comment => (
+                                            <div key={comment.$id} className="bg-[#1f202b] rounded-xl p-3 border border-[#2a2b36]">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 uppercase">
+                                                            {comment.user_email?.[0] || '?'}
+                                                        </div>
+                                                        <span className="text-xs font-bold text-white">{comment.user_email?.split('@')[0] || 'Unknown User'}</span>
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-500 mt-0.5">
+                                                        {new Date(comment.created_at).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-300 whitespace-pre-wrap ml-8">{comment.text}</p>
+                                            </div>
+                                        ))
+                                    )}
                                 </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-slate-400">Owner</span>
-                                    <span className="text-white">Invision Studio</span>
+
+                                {/* Input Box */}
+                                <div className="mt-auto shrink-0 relative bg-[#12131a] border border-[#2a2b36] rounded-xl focus-within:border-purple-500 transition-colors">
+                                    <textarea
+                                        value={newGeneralComment}
+                                        onChange={(e) => setNewGeneralComment(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSendGeneralComment();
+                                            }
+                                        }}
+                                        placeholder="Write a general comment..."
+                                        className="w-full bg-transparent p-3 pr-10 text-sm text-white focus:outline-none resize-none placeholder-slate-600 custom-scrollbar block min-h-[80px]"
+                                        disabled={isSubmittingGeneralComment}
+                                    />
+                                    <button
+                                        onClick={handleSendGeneralComment}
+                                        disabled={!newGeneralComment.trim() || isSubmittingGeneralComment}
+                                        className="absolute bottom-2 right-2 p-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center"
+                                    >
+                                        {isSubmittingGeneralComment ? (
+                                            <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <Send className="w-4 h-4" />
+                                        )}
+                                    </button>
+                                </div>
+                                <div className="text-[10px] text-slate-500 mt-2 text-right">
+                                    Press <span className="font-bold text-slate-400">Enter</span> to send
                                 </div>
                             </div>
-                        </div>
+                        ) : (
+                            <>
+                                {/* Main Asset Card */}
+                                <div className="bg-[#1f202b]/60 rounded-xl border border-[#2a2b36] p-4">
+                                    <h2 className="text-white font-bold text-sm leading-tight mb-2 truncate">
+                                        {asset.file_name}
+                                    </h2>
+                                    <p className="text-slate-400 text-xs mb-4">
+                                        Uploaded on {new Date(asset.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(asset.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                    </p>
 
-                        <div className="pt-6 border-t border-[#1f202b]">
-                            {selectedAnnotation ? (
-                                <p className="text-[10px] text-slate-500 leading-relaxed italic">
-                                    Annotation {selectedAnnotation.name ? `"${selectedAnnotation.name}"` : 'selected'}. View and reply to comments on the canvas popup.
-                                </p>
-                            ) : (
-                                <p className="text-[10px] text-slate-500 leading-relaxed italic">
-                                    Select an annotation pin on the image to view comments and start a discussion.
-                                </p>
-                            )}
-                        </div>
+                                    <div className="grid grid-cols-2 gap-px bg-[#2a2b36] rounded-lg overflow-hidden border border-[#2a2b36]">
+                                        <div className="bg-[#1f202b] p-3 text-center">
+                                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Format</div>
+                                            <div className="text-white font-bold text-sm">{asset.file_type.split('/')[1]?.toUpperCase() || 'UNKNOWN'}</div>
+                                        </div>
+                                        <div className="bg-[#1f202b] p-3 text-center">
+                                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Resolution</div>
+                                            <div className="text-white font-bold text-sm">--</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Mini Cards Row */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    {/* Seen By */}
+                                    <div className="bg-[#1f202b]/60 rounded-xl border border-[#2a2b36] p-3">
+                                        <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-2">
+                                            <User className="w-3.5 h-3.5" />
+                                            <span>Seen By</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 bg-[#2a2b36]/50 rounded-lg p-1.5 border border-[#2a2b36]">
+                                            <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center text-[9px] font-bold text-white shrink-0">
+                                                IN
+                                            </div>
+                                            <span className="text-xs text-white font-medium truncate">Invision Studio</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Status */}
+                                    <div className="bg-[#1f202b]/60 rounded-xl border border-[#2a2b36] p-3">
+                                        <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-2">
+                                            <SquareSquare className="w-3.5 h-3.5" />
+                                            <span>Status</span>
+                                        </div>
+                                        <div className="inline-flex items-center bg-blue-500/10 text-blue-400 text-xs font-semibold px-2 py-1 rounded-md border border-blue-500/20">
+                                            In Progress
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* All Fields Section */}
+                                <div className="pt-2">
+                                    <div className="flex items-center justify-between mb-3 px-1">
+                                        <h3 className="text-white font-bold text-sm flex items-center gap-1.5">
+                                            All Fields <span className="text-slate-500 font-normal">(7)</span>
+                                        </h3>
+                                        <div className="flex items-center gap-2 text-slate-400">
+                                            <button className="hover:text-white transition-colors"><ListFilter className="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5 relative">
+                                        {/* Field Items */}
+                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-3 flex items-center justify-between group cursor-pointer hover:bg-[#252632] transition-colors">
+                                            <div className="flex items-center gap-2 text-slate-300 text-xs font-medium">
+                                                <div className="w-4 h-4 rounded border border-slate-600 flex items-center justify-center shrink-0">
+                                                    <CheckCircle className="w-3 h-3 text-slate-400" />
+                                                </div>
+                                                Alpha Channel
+                                            </div>
+                                            <div className="w-4 h-4 rounded bg-indigo-500 flex items-center justify-center">
+                                                <CheckCircle className="w-3 h-3 text-white" />
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex flex-col gap-1.5 group cursor-pointer hover:bg-[#252632] transition-colors min-h-[52px]">
+                                            <div className="flex items-center gap-2 text-slate-300 text-xs font-medium">
+                                                <User className="w-3.5 h-3.5 text-slate-500" />
+                                                Assignee
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex items-center gap-2 group cursor-pointer hover:bg-[#252632] transition-colors">
+                                            <div className="w-3.5 h-3.5 rounded border border-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-400 shrink-0">1</div>
+                                            <span className="text-slate-300 text-xs font-medium">Audio Bit Depth</span>
+                                        </div>
+
+                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex items-center gap-2 group cursor-pointer hover:bg-[#252632] transition-colors">
+                                            <div className="w-3.5 h-3.5 rounded border border-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-400 shrink-0">1</div>
+                                            <span className="text-slate-300 text-xs font-medium">Audio Bit Rate</span>
+                                        </div>
+
+                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex items-center gap-2 group cursor-pointer hover:bg-[#252632] transition-colors">
+                                            <div className="w-3.5 h-3.5 rounded border border-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-400 shrink-0">1</div>
+                                            <span className="text-slate-300 text-xs font-medium">Audio Channels</span>
+                                        </div>
+
+                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex flex-col gap-1.5 group cursor-pointer hover:bg-[#252632] transition-colors min-h-[52px]">
+                                            <div className="flex items-center gap-2 text-slate-300 text-xs font-medium">
+                                                <div className="w-3.5 h-3.5 rounded border border-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-400 shrink-0">T</div>
+                                                Audio Codec
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex items-center gap-2 group cursor-pointer hover:bg-[#252632] transition-colors">
+                                            <div className="w-3.5 h-3.5 rounded border border-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-400 shrink-0">1</div>
+                                            <span className="text-slate-300 text-xs font-medium">Audio Sample Rate</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </main>
