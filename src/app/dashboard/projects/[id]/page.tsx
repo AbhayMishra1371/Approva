@@ -330,7 +330,9 @@ export default function ProjectDetailPage() {
                             </div>
 
                             <div className="mb-8">
-                                <AssetUpload projectId={id} onUploadSuccess={fetchAssets} />
+                                {(role === 'owner' || role === 'admin') && (
+                                    <AssetUpload projectId={id} onUploadSuccess={fetchAssets} />
+                                )}
                             </div>
 
                             {isLoadingAssets ? (

@@ -24,6 +24,7 @@ interface AnnotationCanvasProps {
     selectedAnnotationId?: string;
     currentColor: string;
     renderPopup?: (annotation: Annotation) => React.ReactNode;
+    readOnly?: boolean;
 }
 
 export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
@@ -34,7 +35,8 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     onSelectAnnotation,
     selectedAnnotationId,
     currentColor,
-    renderPopup
+    renderPopup,
+    readOnly = false
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const innerRef = useRef<HTMLDivElement>(null);
@@ -45,7 +47,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     const [draftName, setDraftName] = useState("New Annotation");
 
 
-    const [mode, setMode] = useState<'annotate' | 'pan'>('annotate');
+    const [mode, setMode] = useState<'annotate' | 'pan'>(readOnly ? 'pan' : 'annotate');
     const [scale, setScale] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
@@ -119,6 +121,8 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
             return;
         }
 
+        if (readOnly) return;
+
         const coords = getCoordinatesFromEvent(e);
         if (!coords) return;
 
@@ -191,13 +195,15 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
             {/* Zoom Controls Overlay */}
             <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
                 <div className="flex bg-[#12131a]/80 backdrop-blur-md border border-[#2a2b36] rounded-lg p-1 shadow-xl">
-                    <button
-                        onClick={() => setMode('annotate')}
-                        className={`p-1.5 rounded-md transition-colors ${mode === 'annotate' ? 'bg-purple-500/20 text-purple-400' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
-                        title="Annotate Mode (Draw)"
-                    >
-                        <Crosshair className="w-4 h-4" />
-                    </button>
+                    {!readOnly && (
+                        <button
+                            onClick={() => setMode('annotate')}
+                            className={`p-1.5 rounded-md transition-colors ${mode === 'annotate' ? 'bg-purple-500/20 text-purple-400' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                            title="Annotate Mode (Draw)"
+                        >
+                            <Crosshair className="w-4 h-4" />
+                        </button>
+                    )}
                     <button
                         onClick={() => setMode('pan')}
                         className={`p-1.5 rounded-md transition-colors ${mode === 'pan' ? 'bg-purple-500/20 text-purple-400' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}

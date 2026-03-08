@@ -21,6 +21,7 @@ interface CommentThreadProps {
     onDeleteComment: (commentId: string) => void;
     status: 'pending' | 'resolved';
     annotationName?: string;
+    readOnly?: boolean;
 }
 
 export const CommentThread: React.FC<CommentThreadProps> = ({
@@ -32,7 +33,8 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     onDelete,
     onDeleteComment,
     status,
-    annotationName
+    annotationName,
+    readOnly = false
 }) => {
     const [newComment, setNewComment] = useState("");
 
@@ -52,7 +54,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
             <div className="p-4 border-b border-[#2a2b36] flex items-center justify-between">
                 <h3 className="text-white font-bold text-sm">{annotationName || 'Annotation Thread'}</h3>
                 <div className="flex items-center gap-2">
-                    {status === 'pending' && (
+                    {!readOnly && status === 'pending' && (
                         <button
                             onClick={onResolve}
                             className="p-1.5 hover:bg-emerald-500/10 text-emerald-500 rounded-lg transition-colors"
@@ -61,17 +63,19 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                             <CheckCircle className="w-4 h-4" />
                         </button>
                     )}
-                    <button
-                        onClick={() => {
-                            if (confirm("Are you sure you want to delete this annotation and all its comments?")) {
-                                onDelete();
-                            }
-                        }}
-                        className="p-1.5 hover:bg-rose-500/10 text-rose-500 rounded-lg transition-colors"
-                        title="Delete Annotation"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </button>
+                    {!readOnly && (
+                        <button
+                            onClick={() => {
+                                if (confirm("Are you sure you want to delete this annotation and all its comments?")) {
+                                    onDelete();
+                                }
+                            }}
+                            className="p-1.5 hover:bg-rose-500/10 text-rose-500 rounded-lg transition-colors"
+                            title="Delete Annotation"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
                     <button
                         onClick={onClose}
                         className="p-1.5 hover:bg-white/10 text-slate-400 rounded-lg transition-colors"
@@ -105,17 +109,19 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                                             {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
-                                    <button
-                                        onClick={() => {
-                                            if (confirm("Delete this comment?")) {
-                                                onDeleteComment(comment.$id);
-                                            }
-                                        }}
-                                        className="p-1 hover:bg-rose-500/10 text-rose-500 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                        title="Delete Comment"
-                                    >
-                                        <Trash2 className="w-3 h-3" />
-                                    </button>
+                                    {!readOnly && (
+                                        <button
+                                            onClick={() => {
+                                                if (confirm("Delete this comment?")) {
+                                                    onDeleteComment(comment.$id);
+                                                }
+                                            }}
+                                            className="p-1 hover:bg-rose-500/10 text-rose-500 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                            title="Delete Comment"
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="bg-[#12131a] rounded-xl p-3 text-sm text-slate-300 break-words border border-[#2a2b36]">
                                     {comment.text}
@@ -126,24 +132,26 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                 )}
             </div>
 
-            <div className="p-4 border-t border-[#2a2b36]">
-                <form onSubmit={handleSubmit} className="relative">
-                    <input
-                        type="text"
-                        placeholder="Write a comment..."
-                        className="w-full bg-[#12131a] border border-[#2a2b36] rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 transition-colors"
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                    />
-                    <button
-                        type="submit"
-                        disabled={!newComment.trim()}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-purple-500 hover:text-purple-400 disabled:text-slate-600 transition-colors"
-                    >
-                        <Send className="w-4 h-4" />
-                    </button>
-                </form>
-            </div>
+            {!readOnly && (
+                <div className="p-4 border-t border-[#2a2b36]">
+                    <form onSubmit={handleSubmit} className="relative">
+                        <input
+                            type="text"
+                            placeholder="Write a comment..."
+                            className="w-full bg-[#12131a] border border-[#2a2b36] rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 transition-colors"
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                        />
+                        <button
+                            type="submit"
+                            disabled={!newComment.trim()}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-purple-500 hover:text-purple-400 disabled:text-slate-600 transition-colors"
+                        >
+                            <Send className="w-4 h-4" />
+                        </button>
+                    </form>
+                </div>
+            )}
         </div>
     );
 };

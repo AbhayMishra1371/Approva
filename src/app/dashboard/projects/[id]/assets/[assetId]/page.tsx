@@ -529,6 +529,7 @@ export default function AssetDetailPage() {
                             assetUrl={asset.url}
                             assetType={asset.file_type}
                             annotations={annotations}
+                            readOnly={role === 'viewer'}
                             onAddAnnotation={handleAddAnnotation}
                             onSelectAnnotation={(ann) => {
                                 setSelectedAnnotation(ann);
@@ -543,6 +544,7 @@ export default function AssetDetailPage() {
                                     annotationId={ann.$id!}
                                     annotationName={ann.name}
                                     comments={comments}
+                                    readOnly={role === 'viewer'}
                                     onAddComment={handleAddComment}
                                     onClose={() => setSelectedAnnotation(null)}
                                     onResolve={handleResolve}
@@ -620,35 +622,39 @@ export default function AssetDetailPage() {
                                 </div>
 
                                 {/* Input Box */}
-                                <div className="mt-auto shrink-0 relative bg-[#12131a] border border-[#2a2b36] rounded-xl focus-within:border-purple-500 transition-colors">
-                                    <textarea
-                                        value={newGeneralComment}
-                                        onChange={(e) => setNewGeneralComment(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                handleSendGeneralComment();
-                                            }
-                                        }}
-                                        placeholder="Write a general comment..."
-                                        className="w-full bg-transparent p-3 pr-10 text-sm text-white focus:outline-none resize-none placeholder-slate-600 custom-scrollbar block min-h-[80px]"
-                                        disabled={isSubmittingGeneralComment}
-                                    />
-                                    <button
-                                        onClick={handleSendGeneralComment}
-                                        disabled={!newGeneralComment.trim() || isSubmittingGeneralComment}
-                                        className="absolute bottom-2 right-2 p-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center"
-                                    >
-                                        {isSubmittingGeneralComment ? (
-                                            <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
-                                        ) : (
-                                            <Send className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                </div>
-                                <div className="text-[10px] text-slate-500 mt-2 text-right">
-                                    Press <span className="font-bold text-slate-400">Enter</span> to send
-                                </div>
+                                {role !== 'viewer' && (
+                                    <>
+                                        <div className="mt-auto shrink-0 relative bg-[#12131a] border border-[#2a2b36] rounded-xl focus-within:border-purple-500 transition-colors">
+                                            <textarea
+                                                value={newGeneralComment}
+                                                onChange={(e) => setNewGeneralComment(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handleSendGeneralComment();
+                                                    }
+                                                }}
+                                                placeholder="Write a general comment..."
+                                                className="w-full bg-transparent p-3 pr-10 text-sm text-white focus:outline-none resize-none placeholder-slate-600 custom-scrollbar block min-h-[80px]"
+                                                disabled={isSubmittingGeneralComment}
+                                            />
+                                            <button
+                                                onClick={handleSendGeneralComment}
+                                                disabled={!newGeneralComment.trim() || isSubmittingGeneralComment}
+                                                className="absolute bottom-2 right-2 p-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center"
+                                            >
+                                                {isSubmittingGeneralComment ? (
+                                                    <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                                                ) : (
+                                                    <Send className="w-4 h-4" />
+                                                )}
+                                            </button>
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 mt-2 text-right">
+                                            Press <span className="font-bold text-slate-400">Enter</span> to send
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         ) : (
                             <>
