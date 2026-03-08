@@ -35,6 +35,17 @@ export const getUser = async () => {
     }
 };
 
+export const getJwt = async () => {
+    const { account } = createBrowserClient();
+    try {
+        const jwt = await account.createJWT();
+        return jwt.jwt;
+    } catch (error: any) {
+        console.error("GetJWT Error:", error?.message || error);
+        return null;
+    }
+};
+
 export const logout = async () => {
     const { account } = createBrowserClient();
     try {

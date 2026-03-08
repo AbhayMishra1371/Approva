@@ -5,12 +5,16 @@ import { OAuthProvider } from "appwrite";
 import { Github, Chrome, ArrowLeft, UserPlus, Mail, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { signUp } from "@/lib/auth/auth";
-import { useRouter } from "next/navigation";
+import { signUp, login, getJwt } from "@/lib/auth/auth";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function SignupPage() {
+function SignupForm() {
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+  const prefilledEmail = searchParams.get("email") || "";
 
   const handleEmailSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -21,8 +25,32 @@ export default function SignupPage() {
 
     try {
       const result = await signUp(email, password);
-      // login returns data which contains { user, session } if successful, but checking if error is handled.
+
       if (result?.user) {
+        // We must log in to establish the session after signing up
+        await login(email, password);
+
+        if (token) {
+          // Store token in localStorage in case component unmounts or to be picked up by layout
+          localStorage.setItem("pendingInviteToken", token);
+
+          // Accept the invite using the new session before redirecting
+          const jwt = await getJwt();
+          const res = await fetch("/api/invites/accept", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(jwt && { "Authorization": `Bearer ${jwt}` })
+            },
+            body: JSON.stringify({ token })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            localStorage.removeItem("pendingInviteToken");
+            router.push(`/dashboard/projects/${data.project_id}`);
+            return;
+          }
+        }
         router.push("/dashboard");
       }
     } catch (error: any) {
@@ -38,9 +66,15 @@ export default function SignupPage() {
       const { account } = createBrowserClient();
       const oauthProvider = provider === "google" ? OAuthProvider.Google : OAuthProvider.Github;
 
+      // Currently, Appwrite OAuth lacks a native 'state' param for passing arbitrary data like inviteId
+      // Store it in localStorage to retrieve it in standard DashboardLayout or a dedicated callback page
+      if (token) {
+        localStorage.setItem("pendingInviteToken", token);
+      }
+
       account.createOAuth2Session(
         oauthProvider,
-        `${window.location.origin}/auth/callback`,
+        `${window.location.origin}/dashboard`,
         `${window.location.origin}/signup`
       );
     } catch (error: any) {
@@ -121,6 +155,7 @@ export default function SignupPage() {
                 <input
                   type="email"
                   name="email"
+                  defaultValue={prefilledEmail}
                   placeholder="name@agency.com"
                   className="w-full rounded-xl py-3 pl-12 pr-4 transition-all font-medium text-xs placeholder:text-slate-600 neon-input"
                   required
@@ -153,7 +188,7 @@ export default function SignupPage() {
             </form>
 
             <div className="mt-6 text-center text-[9px] text-slate-500 uppercase tracking-widest leading-relaxed">
-              Already have an account? <Link href="/login" className="text-primary hover:text-white transition-colors font-bold">Sign In</Link> <br />
+              Already have an account? <Link href={`/login${token ? `?token=${token}&email=${encodeURIComponent(prefilledEmail)}` : ''}`} className="text-primary hover:text-white transition-colors font-bold">Sign In</Link> <br />
               <span className="opacity-60">By continuing, you agree to our Terms of Service</span>
             </div>
           </div>
@@ -174,5 +209,13 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="h-screen bg-[#0b0c10] flex items-center justify-center text-white">Loading...</div>}>
+      <SignupForm />
+    </Suspense>
   );
 }

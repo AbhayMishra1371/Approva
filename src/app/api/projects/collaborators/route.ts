@@ -5,6 +5,7 @@ import nodemailer from "nodemailer";
 import { render } from "@react-email/render";
 import ProjectInviteEmail from "@/emails/ProjectInviteEmail";
 import * as React from "react";
+import { v4 as uuidv4 } from 'uuid';
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
@@ -94,6 +95,7 @@ export async function POST(request: Request) {
     );
 
     /* Create invite in DB */
+    const inviteToken = uuidv4();
     const invite = await databases.createDocument(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID!,
@@ -102,6 +104,8 @@ export async function POST(request: Request) {
         project_id: projectId,
         email,
         role,
+        token: inviteToken,
+        status: "pending",
         invited_at: new Date().toISOString(),
       }
     );
@@ -109,12 +113,12 @@ export async function POST(request: Request) {
     /* Send email via Nodemailer */
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
       try {
-        // Use NEXT_PUBLIC_APP_URL first, fallback to origin, then localhost
+
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000";
-        const inviteLink = `${baseUrl}/dashboard`;
+        const inviteLink = `${baseUrl}/invite?token=${inviteToken}`;
 
         let targetEmail = email;
-        const testMatch = email.match(/\+(.*?)@/); // test+user@gmail.com test case
+        const testMatch = email.match(/\+(.*?)@/);
         if (process.env.SMTP_USER === "test@example.com") {
           console.log("Mock Environment");
         }
@@ -165,9 +169,7 @@ export async function POST(request: Request) {
   }
 }
 
-/* =========================================
-   GET → Fetch Collaborators
-========================================= */
+//GET-fetch collaborators
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);

@@ -5,12 +5,16 @@ import { OAuthProvider } from "appwrite";
 import { Github, Chrome, ArrowLeft, Lock, Mail, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { login } from "@/lib/auth/auth";
-import { useRouter } from "next/navigation";
+import { login, getJwt } from "@/lib/auth/auth";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function LoginPage() {
+function LoginForm() {
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+  const prefilledEmail = searchParams.get("email") || "";
 
   const handleEmailLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -23,6 +27,23 @@ export default function LoginPage() {
       const result = await login(email, password);
       // login returns data which contains { user, session } if successful, but checking if error is handled.
       if (result?.user) {
+        if (token) {
+          // Accept the invite using the new session before redirecting
+          const jwt = await getJwt();
+          const res = await fetch("/api/invites/accept", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(jwt && { "Authorization": `Bearer ${jwt}` })
+            },
+            body: JSON.stringify({ token })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            router.push(`/dashboard/projects/${data.project_id}`);
+            return;
+          }
+        }
         router.push("/dashboard");
       }
     } catch (error: any) {
@@ -37,6 +58,12 @@ export default function LoginPage() {
     try {
       const { account } = createBrowserClient();
       const oauthProvider = provider === "google" ? OAuthProvider.Google : OAuthProvider.Github;
+
+      // Currently, Appwrite OAuth lacks a native 'state' param for passing arbitrary data like inviteId
+      // Store it in localStorage to retrieve it in standard DashboardLayout or a dedicated callback page
+      if (token) {
+        localStorage.setItem("pendingInviteToken", token);
+      }
 
       account.createOAuth2Session(
         oauthProvider,
@@ -121,6 +148,7 @@ export default function LoginPage() {
                 <input
                   type="email"
                   name="email"
+                  defaultValue={prefilledEmail}
                   placeholder="name@agency.com"
                   className="w-full rounded-xl py-3 pl-12 pr-4 transition-all font-medium text-xs placeholder:text-slate-600 neon-input"
                   required
@@ -174,5 +202,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="h-screen bg-[#0b0c10] flex items-center justify-center text-white">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

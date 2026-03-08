@@ -1,0 +1,1 @@
+const auth = require('./src/lib/auth/auth.ts'); console.log(auth);

@@ -37,18 +37,18 @@ export default function ProjectsPage() {
 
     const fetchProjects = async () => {
         try {
-            const { account, databases } = createBrowserClient();
-            const user = await account.get();
-            const response = await databases.listDocuments(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-                [
-                    Query.equal("owner_id", user.$id),
-                    Query.orderDesc("$createdAt")
-                ]
-            );
-            const data = response.documents.map((doc: any) => ({ ...doc, id: doc.$id }));
-            setProjects(data);
+            const { account } = createBrowserClient();
+            const { jwt } = await account.createJWT();
+            const res = await fetch("/api/projects", {
+                headers: { "Authorization": `Bearer ${jwt}` }
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setProjects(data.projects);
+            } else {
+                console.error("Failed to fetch projects");
+            }
         } catch (err) {
             console.error("Error fetching projects:", err instanceof Error ? err.message : err);
         } finally {

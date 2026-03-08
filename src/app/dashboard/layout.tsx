@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getUser, logout } from "@/lib/auth/auth";
+import { getUser, logout, getJwt } from "@/lib/auth/auth";
 import {
     LayoutDashboard,
     FolderOpen,
@@ -31,6 +31,29 @@ export default function DashboardLayout({
             const currentUser = await getUser();
             if (currentUser) {
                 setUser(currentUser);
+
+                // Check if they came from an invite
+                const pendingInviteToken = localStorage.getItem("pendingInviteToken");
+                if (pendingInviteToken) {
+                    try {
+                        const jwt = await getJwt();
+                        const res = await fetch("/api/invites/accept", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                ...(jwt && { "Authorization": `Bearer ${jwt}` })
+                            },
+                            body: JSON.stringify({ token: pendingInviteToken })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            localStorage.removeItem("pendingInviteToken");
+                            router.push(`/dashboard/projects/${data.project_id}`);
+                        }
+                    } catch (error) {
+                        console.error("Failed to accept pending invite", error);
+                    }
+                }
             } else {
                 router.push("/login");
             }
