@@ -264,12 +264,6 @@ export default function ProjectDetailPage() {
                                 </button>
                             </>
                         )}
-                        {!isLoadingRole && role === "reviewer" && (
-                            <button className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded-lg px-4 py-2.5 flex items-center gap-2 transition-colors font-medium text-sm">
-                                <CheckCircle className="w-4 h-4" />
-                                Approve
-                            </button>
-                        )}
                         {/* Viewers see no action buttons here */}
                     </div>
                 </div>
@@ -384,6 +378,15 @@ export default function ProjectDetailPage() {
                                                     <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-400 border border-slate-700">
                                                         {asset.version}
                                                     </span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                                                    <div className={`inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border 
+                                                        ${asset.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                                            asset.status === 'rejected' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                                                                asset.status === 'changes_requested' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                                                    'bg-purple-500/10 text-purple-400 border-purple-500/20'}`}>
+                                                        {(!asset.status || asset.status === 'pending') ? 'IN REVIEW' : asset.status.replace('_', ' ')}
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center justify-between text-xs text-slate-500">
                                                     <span>{formatBytes(asset.size)}</span>

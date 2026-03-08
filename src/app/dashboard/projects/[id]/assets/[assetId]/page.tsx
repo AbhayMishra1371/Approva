@@ -59,6 +59,9 @@ export default function AssetDetailPage() {
     const [newGeneralComment, setNewGeneralComment] = useState("");
     const [isSubmittingGeneralComment, setIsSubmittingGeneralComment] = useState(false);
 
+    // Role state
+    const [role, setRole] = useState<'owner' | 'admin' | 'reviewer' | 'viewer' | null>(null);
+
     const colors = [
         { name: 'Purple', value: '#a855f7' },
         { name: 'Cyan', value: '#06b6d4' },
@@ -139,6 +142,33 @@ export default function AssetDetailPage() {
 
         fetchData();
     }, [assetId, annotationsCollectionId]);
+
+    useEffect(() => {
+        const fetchRole = async () => {
+            try {
+                const { account } = createBrowserClient();
+                const { jwt } = await account.createJWT();
+                const res = await fetch(`/api/projects/collaborators?projectId=${projectId}`, {
+                    headers: { "Authorization": `Bearer ${jwt}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.callerRole) {
+                        setRole(data.callerRole as 'owner' | 'admin' | 'reviewer' | 'viewer');
+                    } else {
+                        console.log("DEBUG: callerRole is missing in API response =>", data);
+                    }
+                } else {
+                    console.error("DEBUG: Failed to fetch role", await res.text());
+                }
+            } catch (error) {
+                console.error("Error fetching user role", error);
+            }
+        };
+        fetchRole();
+    }, [projectId]);
+
+    console.log("DEBUG - Asset Render State: ", { role, assetStatus: asset?.status });
 
     const fetchComments = async (annotationId: string) => {
         try {
@@ -345,6 +375,59 @@ export default function AssetDetailPage() {
         }
     };
 
+    const handleStatusChange = async (newStatus: string) => {
+        setIsLoading(true);
+        try {
+            const { account } = createBrowserClient();
+            const { jwt } = await account.createJWT();
+
+            // Prompt for a comment if rejecting/requesting changes
+            let comment = "";
+            if (newStatus === 'rejected' || newStatus === 'changes_requested') {
+                comment = prompt("Please provide a reason for this decision:") || "";
+                if (!comment) {
+                    setIsLoading(false);
+                    return; // Abort if they cancel the prompt
+                }
+            } else if (newStatus === 'approved') {
+                comment = "Asset approved.";
+            }
+
+            const res = await fetch(`/api/projects/${projectId}/assets/${assetId}/status`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${jwt}`
+                },
+                body: JSON.stringify({ status: newStatus, comment })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setAsset(data.asset);
+                // Optimistically add the generated comment to the UI
+                if (comment) {
+                    const user = await account.get();
+                    setGeneralComments([...generalComments, {
+                        $id: Date.now().toString(),
+                        user_id: user.$id,
+                        user_email: user.email,
+                        text: comment,
+                        created_at: new Date().toISOString()
+                    }]);
+                }
+            } else {
+                const errData = await res.json();
+                alert(errData.error || "Failed to update status");
+            }
+        } catch (error) {
+            console.error("Status update error", error);
+            alert("An error occurred");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-screen bg-[#0b0c10]">
@@ -408,10 +491,32 @@ export default function AssetDetailPage() {
                             <Download className="w-3.5 h-3.5 text-purple-400" />
                             Download
                         </button>
-                        <button className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Approve Asset
-                        </button>
+
+                        {(role === 'reviewer' || role === 'owner' || role === 'admin') && (!asset.status || asset.status === 'in_review' || asset.status === 'draft' || asset.status.toLowerCase() === 'pending') && (
+                            <>
+                                <button onClick={() => handleStatusChange('changes_requested')} className="flex items-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
+                                    Request Changes
+                                </button>
+                                <button onClick={() => handleStatusChange('rejected')} className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
+                                    Reject
+                                </button>
+                                <button onClick={() => handleStatusChange('approved')} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
+                                    <CheckCircle className="w-3.5 h-3.5" />
+                                    Approve Asset
+                                </button>
+                            </>
+                        )}
+                        {(role === 'reviewer' || role === 'owner' || role === 'admin') && asset.status === 'approved' && (
+                            <button disabled className="flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-lg px-3 py-1.5 font-medium text-xs cursor-not-allowed">
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                Approved
+                            </button>
+                        )}
+                        {(role === 'reviewer' || role === 'owner' || role === 'admin') && (asset.status === 'rejected' || asset.status === 'changes_requested') && (
+                            <button onClick={() => handleStatusChange('in_review')} className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
+                                Submit for Review
+                            </button>
+                        )}
                     </div>
                 </div>
             </header>
@@ -590,8 +695,12 @@ export default function AssetDetailPage() {
                                             <SquareSquare className="w-3.5 h-3.5" />
                                             <span>Status</span>
                                         </div>
-                                        <div className="inline-flex items-center bg-blue-500/10 text-blue-400 text-xs font-semibold px-2 py-1 rounded-md border border-blue-500/20">
-                                            In Progress
+                                        <div className={`inline-flex items-center text-xs font-semibold px-2 py-1 rounded-md border 
+                                            ${asset.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                                asset.status === 'rejected' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                                                    asset.status === 'changes_requested' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                                        'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
+                                            {asset.status ? asset.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'In Review'}
                                         </div>
                                     </div>
                                 </div>
