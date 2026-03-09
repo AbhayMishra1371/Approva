@@ -22,10 +22,10 @@ import {
     UploadCloud
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-// Removed supabase import
 import { AssetUpload } from "@/components/projects/AssetUpload";
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query } from "appwrite";
+import { toast } from "sonner";
 
 type Project = {
     id: string;
@@ -146,9 +146,10 @@ export default function ProjectDetailPage() {
                 projectId
             );
             router.push("/dashboard/projects");
+            toast.success("Project deleted successfully");
         } catch (err) {
             console.error("Error deleting project:", err);
-            alert("An error occurred while deleting the project.");
+            toast.error("An error occurred while deleting the project.");
         }
     };
 
@@ -181,9 +182,10 @@ export default function ProjectDetailPage() {
             );
 
             fetchAssets();
+            toast.success("Asset deleted successfully");
         } catch (err) {
             console.error("Error deleting asset:", err);
-            alert("An error occurred while deleting the asset.");
+            toast.error("An error occurred while deleting the asset.");
         }
     };
 
@@ -211,14 +213,14 @@ export default function ProjectDetailPage() {
                 setIsInviteModalOpen(false);
                 setInviteEmail("");
                 setInviteRole("reviewer");
-                alert("Invitation sent successfully!");
+                toast.success("Invitation sent successfully!");
             } else {
                 const data = await res.json();
-                alert(data.error || "Failed to send invitation.");
+                toast.error(data.error || "Failed to send invitation.");
             }
         } catch (err) {
             console.error("Error during project invitation:", err instanceof Error ? err.message : err);
-            alert("An error occurred while sending the invitation.");
+            toast.error("An error occurred while sending the invitation.");
         } finally {
             setIsInviting(false);
         }

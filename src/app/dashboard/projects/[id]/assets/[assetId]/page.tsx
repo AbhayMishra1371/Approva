@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query, ID } from "appwrite";
+import { toast } from "sonner";
 import { AnnotationCanvas, Annotation } from "@/components/projects/AnnotationCanvas";
 import { CommentThread, Comment } from "@/components/projects/CommentThread";
 
@@ -224,7 +225,7 @@ export default function AssetDetailPage() {
             setComments([]); // New annotation has no comments
         } catch (error) {
             console.error("Failed to save annotation:", error);
-            alert("Failed to save annotation. Make sure the 'annotations' collection exists.");
+            toast.error("Failed to save annotation. Make sure the 'annotations' collection exists.");
         }
     };
 
@@ -257,7 +258,7 @@ export default function AssetDetailPage() {
             }]);
         } catch (e) {
             console.error("Failed to save comment:", e);
-            alert("Failed to save comment.");
+            toast.error("Failed to save comment.");
         }
     };
 
@@ -317,9 +318,10 @@ export default function AssetDetailPage() {
             setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
             setSelectedAnnotation(null);
             setComments([]); // Clear comments
+            toast.success("Annotation deleted successfully");
         } catch (e) {
             console.error("Failed to delete annotation:", e);
-            alert("Failed to delete annotation.");
+            toast.error("Failed to delete annotation.");
         }
     };
 
@@ -333,9 +335,10 @@ export default function AssetDetailPage() {
             );
 
             setComments(comments.filter(c => c.$id !== commentId));
+            toast.success("Comment deleted successfully");
         } catch (e) {
             console.error("Failed to delete comment:", e);
-            alert("Failed to delete comment.");
+            toast.error("Failed to delete comment.");
         }
     };
 
@@ -369,7 +372,7 @@ export default function AssetDetailPage() {
             setNewGeneralComment("");
         } catch (error) {
             console.error("Failed to save general comment:", error);
-            alert("Failed to send comment. Ensure the 'general_comments' table is created with attributes 'asset_id', 'user_id', 'user_email', and 'text'.");
+            toast.error("Failed to send comment. Ensure the 'general_comments' table is created with attributes 'asset_id', 'user_id', 'user_email', and 'text'.");
         } finally {
             setIsSubmittingGeneralComment(false);
         }
@@ -416,13 +419,14 @@ export default function AssetDetailPage() {
                         created_at: new Date().toISOString()
                     }]);
                 }
+                toast.success(`Asset marked as ${newStatus.replace('_', ' ')}`);
             } else {
                 const errData = await res.json();
-                alert(errData.error || "Failed to update status");
+                toast.error(errData.error || "Failed to update status");
             }
         } catch (error) {
             console.error("Status update error", error);
-            alert("An error occurred");
+            toast.error("An error occurred");
         } finally {
             setIsLoading(false);
         }

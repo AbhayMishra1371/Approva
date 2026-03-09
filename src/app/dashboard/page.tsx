@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query } from "appwrite";
+import { toast } from "sonner";
 import {
     AreaChart,
     Area,
@@ -135,14 +136,15 @@ export default function DashboardPage() {
             });
             if (res.ok) {
                 setInvites(invites.filter((inv) => inv.id !== inviteId));
+                toast.success("Invite accepted successfully!");
                 // Optionally refresh other dashboard data here
             } else {
                 const data = await res.json();
-                alert(data.error || "Failed to accept invite");
+                toast.error(data.error || "Failed to accept invite");
             }
         } catch (err) {
             console.error("Dashboard Assets Fetch Error:", err instanceof Error ? err.message : err);
-            alert("An error occurred while accepting");
+            toast.error("An error occurred while accepting");
         } finally {
             setIsAccepting(null);
         }
