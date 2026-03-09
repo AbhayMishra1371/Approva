@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { signUp, login, getJwt } from "@/lib/auth/auth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 
 function SignupForm() {
   const [isLoading, setIsLoading] = useState<string | null>(null);
@@ -15,6 +15,23 @@ function SignupForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const prefilledEmail = searchParams.get("email") || "";
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { account } = createBrowserClient();
+        const user = await account.get();
+        if (user) {
+          router.push("/dashboard");
+        }
+      } catch (err) {
+        // Not logged in, stay on this page
+      }
+    };
+    if (!token) {
+      checkSession();
+    }
+  }, [router, token]);
 
   const handleEmailSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
