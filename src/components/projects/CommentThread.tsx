@@ -2,6 +2,17 @@
 
 import React, { useState } from 'react';
 import { Send, User, X, CheckCircle, Trash2 } from 'lucide-react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export type Comment = {
     $id: string;
@@ -64,17 +75,28 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                         </button>
                     )}
                     {!readOnly && (
-                        <button
-                            onClick={() => {
-                                if (confirm("Are you sure you want to delete this annotation and all its comments?")) {
-                                    onDelete();
-                                }
-                            }}
-                            className="p-1.5 hover:bg-rose-500/10 text-rose-500 rounded-lg transition-colors"
-                            title="Delete Annotation"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <button
+                                    className="p-1.5 hover:bg-rose-500/10 text-rose-500 rounded-lg transition-colors"
+                                    title="Delete Annotation"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-[#12131a] border-[#1f202b] text-white">
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-slate-400">
+                                        This will permanently delete this annotation and all of its comments. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel className="bg-[#12131a] border-[#2a2b36] hover:text-white text-slate-300">Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={onDelete} className="bg-rose-500 hover:bg-rose-600 text-white">Delete Annotation</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     )}
                     <button
                         onClick={onClose}
@@ -110,17 +132,28 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                                         </span>
                                     </div>
                                     {!readOnly && (
-                                        <button
-                                            onClick={() => {
-                                                if (confirm("Delete this comment?")) {
-                                                    onDeleteComment(comment.$id);
-                                                }
-                                            }}
-                                            className="p-1 hover:bg-rose-500/10 text-rose-500 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                            title="Delete Comment"
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                        </button>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <button
+                                                    className="p-1 hover:bg-rose-500/10 text-rose-500 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                    title="Delete Comment"
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent className="bg-[#12131a] border-[#1f202b] text-white max-w-sm rounded-[2rem]">
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete comment?</AlertDialogTitle>
+                                                    <AlertDialogDescription className="text-slate-400">
+                                                        This will permanently delete this comment.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel className="bg-[#1e1f2b] border-[#2a2b36] hover:bg-[#2a2b36] hover:text-white text-slate-300 h-9 px-4 rounded-xl text-xs font-semibold">Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => onDeleteComment(comment.$id)} className="bg-rose-500 hover:bg-rose-600 text-white h-9 px-4 rounded-xl text-xs font-semibold shadow-xl shadow-rose-500/20">Delete</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     )}
                                 </div>
                                 <div className="bg-[#12131a] rounded-xl p-3 text-sm text-slate-300 break-words border border-[#2a2b36]">

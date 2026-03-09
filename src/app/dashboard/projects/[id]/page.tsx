@@ -26,6 +26,17 @@ import { AssetUpload } from "@/components/projects/AssetUpload";
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query } from "appwrite";
 import { toast } from "sonner";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type Project = {
     id: string;
@@ -134,10 +145,6 @@ export default function ProjectDetailPage() {
     };
 
     const handleDeleteProject = async (projectId: string) => {
-        if (!confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
-            return;
-        }
-
         try {
             const { databases } = createBrowserClient();
             await databases.deleteDocument(
@@ -154,10 +161,6 @@ export default function ProjectDetailPage() {
     };
 
     const handleDeleteAsset = async (assetId: string) => {
-        if (!confirm("Are you sure you want to delete this asset? This action cannot be undone.")) {
-            return;
-        }
-
         try {
             const { databases, storage } = createBrowserClient();
             const assetObj = await databases.getDocument(
@@ -254,7 +257,6 @@ export default function ProjectDetailPage() {
                     <div className="flex items-center gap-3">
                         {!isLoadingRole && (role === "owner" || role === "admin") && (
                             <>
-
                                 <button
                                     onClick={() => setIsInviteModalOpen(true)}
                                     className="bg-[#1e1f2b] hover:bg-[#2a2b36] border border-[#2a2b36] text-white rounded-lg px-4 py-2.5 flex items-center gap-2 transition-colors font-medium text-sm"
@@ -262,10 +264,26 @@ export default function ProjectDetailPage() {
                                     <UserPlus className="w-4 h-4 text-purple-400" />
                                     Invite
                                 </button>
-                                <button className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg px-4 py-2.5 flex items-center gap-2 transition-colors font-medium text-sm" onClick={() => handleDeleteProject(id)}>
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                </button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <button className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-lg px-4 py-2.5 flex items-center gap-2 transition-colors font-medium text-sm">
+                                            <Trash2 className="w-4 h-4" />
+                                            Delete
+                                        </button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent className="bg-[#12131a] border-[#1f202b] text-white">
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete project?</AlertDialogTitle>
+                                            <AlertDialogDescription className="text-slate-400">
+                                                Are you sure you want to delete this project? This action cannot be undone.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel className="bg-[#1e1f2b] border-[#2a2b36] hover:bg-[#2a2b36] hover:text-white text-slate-300">Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteProject(id)} className="bg-rose-500 hover:bg-rose-600 text-white">Delete</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </>
                         )}
                         {/* Viewers see no action buttons here */}
@@ -368,20 +386,30 @@ export default function ProjectDetailPage() {
                                                     >
                                                         <Maximize2 className="w-5 h-5" />
                                                     </Link>
-                                                    <button className="w-10 h-10 rounded-full bg-[#1e1f2b] flex items-center justify-center text-white hover:bg-[#2a2b36] transition-colors shadow-lg border border-[#2a2b36]">
-                                                        <Download className="w-5 h-5" />
-                                                    </button>
                                                     {(role === 'owner' || role === 'admin') && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDeleteAsset(asset.id);
-                                                            }}
-                                                            className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-colors shadow-lg"
-                                                            title="Delete Asset"
-                                                        >
-                                                            <Trash2 className="w-5 h-5" />
-                                                        </button>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <button
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-500 border border-rose-500/20 hover:bg-rose-500 hover:text-white transition-colors shadow-lg"
+                                                                    title="Delete Asset"
+                                                                >
+                                                                    <Trash2 className="w-5 h-5" />
+                                                                </button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent className="bg-[#12131a] border-[#1f202b] text-white" onClick={(e) => e.stopPropagation()}>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Delete asset?</AlertDialogTitle>
+                                                                    <AlertDialogDescription className="text-slate-400">
+                                                                        Are you sure you want to delete this asset? This action cannot be undone.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel className="bg-[#1e1f2b] border-[#2a2b36] hover:bg-[#2a2b36] hover:text-white text-slate-300">Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDeleteAsset(asset.id)} className="bg-rose-500 hover:bg-rose-600 text-white">Delete</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
                                                     )}
                                                 </div>
                                             </div>
