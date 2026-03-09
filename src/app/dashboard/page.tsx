@@ -151,7 +151,7 @@ export default function DashboardPage() {
     return (
         <div className="flex flex-col gap-8 w-full">
             {/* Header */}
-            <div className="flex items-end justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white mb-1">Dashboard</h1>
                     <p className="text-slate-400">
@@ -165,7 +165,7 @@ export default function DashboardPage() {
             {invites.length > 0 && (
                 <div className="flex flex-col gap-3">
                     {invites.map((invite) => (
-                        <div key={invite.id} className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 flex items-center justify-between shadow-sm animate-in fade-in zoom-in-95 duration-300">
+                        <div key={invite.id} className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-in fade-in zoom-in-95 duration-300">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
                                     <UserPlus className="w-5 h-5 text-purple-400" />
@@ -182,7 +182,7 @@ export default function DashboardPage() {
                             <button
                                 onClick={() => handleAcceptInvite(invite.id)}
                                 disabled={isAccepting === invite.id}
-                                className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
+                                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
                             >
                                 {isAccepting === invite.id ? "Accepting..." : "Accept Invite"}
                             </button>
@@ -227,7 +227,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Trend Chart (Takes up 2 columns on lg) */}
                 <div className="lg:col-span-2 bg-[#12131a] border border-[#1f202b] rounded-xl p-6">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                         <h2 className="text-lg font-bold text-white">Approval Trends</h2>
                         <div className="flex items-center gap-4 text-sm">
                             <div className="flex items-center gap-2">
@@ -361,7 +361,7 @@ export default function DashboardPage() {
 
             {/* Recent Approvals Section */}
             <div className="bg-[#12131a] border border-[#1f202b] rounded-xl p-6">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                     <h2 className="text-lg font-bold text-white">Recent Approvals</h2>
                     <button className="text-sm text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1 font-medium">
                         View All <span className="text-lg leading-none">&rarr;</span>
@@ -372,7 +372,7 @@ export default function DashboardPage() {
                     {recentApprovalsData.map((item) => (
                         <div
                             key={item.id}
-                            className="flex items-center justify-between p-4 rounded-xl bg-[#1e1f2b]/50 border border-[#1f202b] hover:bg-[#1e1f2b] transition-colors group cursor-pointer"
+                            className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#1e1f2b]/50 border border-[#1f202b] hover:bg-[#1e1f2b] transition-colors group cursor-pointer"
                         >
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-lg bg-[#2a2b36] flex items-center justify-center text-slate-400 group-hover:text-purple-400 transition-colors">

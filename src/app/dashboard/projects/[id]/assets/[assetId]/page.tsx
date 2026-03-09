@@ -450,7 +450,7 @@ export default function AssetDetailPage() {
     return (
         <div className="flex flex-col h-screen bg-[#0b0c10] overflow-hidden">
             {/* Minimal Header */}
-            <header className="h-16 border-b border-[#1f202b] flex items-center justify-between px-6 bg-[#12131a] z-10">
+            <header className="min-h-[4rem] py-3 border-b border-[#1f202b] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 px-4 lg:px-6 bg-[#12131a] z-10">
                 <div className="flex items-center gap-4">
                     <Link
                         href={`/dashboard/projects/${projectId}`}
@@ -469,7 +469,7 @@ export default function AssetDetailPage() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-6">
+                <div className="flex flex-wrap items-center gap-4 lg:gap-6 w-full lg:w-auto">
                     {/* Color Palette */}
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-[#12131a] rounded-lg border border-[#1f202b]">
                         <span className="text-[10px] text-slate-500 font-medium mr-1 uppercase tracking-wider">Color</span>
@@ -486,7 +486,7 @@ export default function AssetDetailPage() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2 lg:gap-3">
                         <button className="flex items-center gap-2 bg-[#1e1f2b] hover:bg-[#2a2b36] border border-[#2a2b36] text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
                             <Download className="w-3.5 h-3.5 text-purple-400" />
                             Download
@@ -521,9 +521,9 @@ export default function AssetDetailPage() {
                 </div>
             </header>
 
-            <main className="flex-1 flex overflow-hidden relative">
+            <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
                 {/* Canvas Area */}
-                <div className="flex-1 overflow-hidden flex flex-col items-center justify-center p-8 bg-black/40">
+                <div className="flex-1 overflow-hidden flex flex-col items-center justify-center p-4 lg:p-8 bg-black/40 min-h-[50vh] lg:min-h-0">
                     <div className="w-full max-w-5xl aspect-video bg-[#12131a] rounded-xl shadow-2xl border border-[#1f202b] overflow-hidden relative group">
                         <AnnotationCanvas
                             assetUrl={asset.url}
@@ -564,7 +564,7 @@ export default function AssetDetailPage() {
                 </div>
 
                 {/* Enhanced Info / Comment Sidebar */}
-                <div className="w-96 bg-[#1a1b23] border-l border-[#1f202b] flex flex-col z-20 overflow-hidden">
+                <div className="w-full lg:w-96 bg-[#1a1b23] border-t lg:border-t-0 lg:border-l border-[#1f202b] flex flex-col z-20 overflow-hidden h-full">
                     {/* Tabs */}
                     <div className="flex p-3 bg-[#1a1b23] border-b border-[#252632]">
                         <div className="flex w-full bg-[#12131a] rounded-lg p-1 border border-[#252632]">

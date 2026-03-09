@@ -73,7 +73,7 @@ export default function ProjectsPage() {
     return (
         <div className="flex flex-col gap-8 w-full">
             {/* Header */}
-            <div className="flex items-end justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-white mb-1">Projects</h1>
                     <p className="text-slate-400">
@@ -301,7 +301,7 @@ function CreateProjectModal({
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
                             <label className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Deadline</label>
                             <input

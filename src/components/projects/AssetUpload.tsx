@@ -10,9 +10,10 @@ import { createBrowserClient } from "@/lib/appwrite/client";
 interface AssetUploadProps {
     projectId: string;
     onUploadSuccess?: () => void;
+    hideWhenIdle?: boolean;
 }
 
-export function AssetUpload({ projectId, onUploadSuccess }: AssetUploadProps) {
+export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle }: AssetUploadProps) {
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
@@ -124,7 +125,7 @@ export function AssetUpload({ projectId, onUploadSuccess }: AssetUploadProps) {
     });
 
     return (
-        <div className="w-full">
+        <div className={`w-full ${hideWhenIdle && !uploading && !success && !error && !isDragActive && !isDragReject ? 'hidden' : ''}`}>
             <div
                 {...getRootProps()}
                 className={`

@@ -18,7 +18,8 @@ import {
     Video,
     FileIcon,
     Download,
-    Maximize2
+    Maximize2,
+    UploadCloud
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 // Removed supabase import
@@ -234,7 +235,7 @@ export default function ProjectDetailPage() {
                     <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
                     Back to Projects
                 </Link>
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
                         <div className="flex items-center gap-3 mb-1">
                             <h1 className="text-3xl font-bold text-white">Project View</h1>
@@ -251,6 +252,7 @@ export default function ProjectDetailPage() {
                     <div className="flex items-center gap-3">
                         {!isLoadingRole && (role === "owner" || role === "admin") && (
                             <>
+
                                 <button
                                     onClick={() => setIsInviteModalOpen(true)}
                                     className="bg-[#1e1f2b] hover:bg-[#2a2b36] border border-[#2a2b36] text-white rounded-lg px-4 py-2.5 flex items-center gap-2 transition-colors font-medium text-sm"
@@ -270,7 +272,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-6 border-b border-[#1f202b]">
+            <div className="flex items-center gap-4 sm:gap-6 border-b border-[#1f202b] overflow-x-auto no-scrollbar">
                 <TabButton
                     active={activeTab === "assets"}
                     onClick={() => setActiveTab("assets")}
@@ -304,11 +306,11 @@ export default function ProjectDetailPage() {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 bg-[#12131a] border border-[#1f202b] rounded-xl flex">
+            <div className="flex-1 bg-[#12131a] border border-[#1f202b] rounded-xl flex flex-col md:flex-row overflow-hidden min-h-[600px] md:min-h-0">
                 {activeTab === "assets" && (
                     <>
                         {/* Folder Tree Placeholder */}
-                        <div className="w-64 border-r border-[#1f202b] p-4 flex flex-col">
+                        <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-[#1f202b] p-4 flex flex-col shrink-0">
                             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Folders</h3>
                             <div className="space-y-1">
                                 <FolderItem name="All Assets" active />
@@ -320,18 +322,27 @@ export default function ProjectDetailPage() {
                         </div>
 
                         {/* Asset Grid Placeholder */}
-                        <div className="flex-1 p-6 flex flex-col">
-                            <div className="flex items-center justify-between mb-6">
-                                <h2 className="text-lg font-bold text-white">All Assets</h2>
-                                <div className="flex gap-2">
-                                    <div className="w-64 h-9 bg-[#1e1f2b] rounded-lg border border-[#2a2b36]" />
-                                    <div className="w-9 h-9 bg-[#1e1f2b] rounded-lg border border-[#2a2b36]" />
+                        <div className="flex-1 p-4 md:p-6 flex flex-col min-w-0 overflow-y-auto">
+                            <div className="flex items-center justify-between gap-2 sm:gap-4 mb-6">
+                                <h2 className="text-lg font-bold text-white shrink-0">All Assets</h2>
+                                <div className="flex gap-2 items-center justify-end flex-1">
+                                    <div className="hidden sm:block w-64 h-9 bg-[#1e1f2b] rounded-lg border border-[#2a2b36]" />
+                                    <div className="hidden sm:block w-9 h-9 bg-[#1e1f2b] rounded-lg border border-[#2a2b36]" />
+                                    {(role === 'owner' || role === 'admin') && (
+                                        <button
+                                            onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
+                                            className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 flex items-center gap-1.5 sm:gap-2 transition-colors font-medium text-xs sm:text-sm shadow-lg shadow-purple-500/20 shrink-0"
+                                        >
+                                            <UploadCloud className="w-4 h-4" />
+                                            <span>Upload Asset</span>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
-                            <div className="mb-8">
+                            <div className="mb-4 sm:mb-8">
                                 {(role === 'owner' || role === 'admin') && (
-                                    <AssetUpload projectId={id} onUploadSuccess={fetchAssets} />
+                                    <AssetUpload projectId={id} onUploadSuccess={fetchAssets} hideWhenIdle={true} />
                                 )}
                             </div>
 
@@ -594,7 +605,7 @@ function CollaboratorsTab({ projectId, currentRole }: { projectId: string; curre
                     ) : (
                         <div className="divide-y divide-[#2a2b36]">
                             {collaborators.map(c => (
-                                <div key={c.id} className="p-4 flex items-center justify-between hover:bg-[#252634] transition-colors">
+                                <div key={c.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-[#252634] transition-colors">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold shadow-md">
                                             {c.email ? c.email.charAt(0).toUpperCase() : <Users className="w-5 h-5" />}
@@ -628,7 +639,7 @@ function CollaboratorsTab({ projectId, currentRole }: { projectId: string; curre
                     <div className="bg-[#1e1f2b] border border-[#2a2b36] border-dashed rounded-xl overflow-hidden shadow-sm">
                         <div className="divide-y divide-[#2a2b36]">
                             {invites.map(i => (
-                                <div key={i.id} className="p-4 flex items-center justify-between bg-[#151720]/50 hover:bg-[#1a1c26] transition-colors">
+                                <div key={i.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#151720]/50 hover:bg-[#1a1c26] transition-colors">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-400">
                                             {i.email.charAt(0).toUpperCase()}

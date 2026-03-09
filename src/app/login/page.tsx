@@ -11,6 +11,7 @@ import { Suspense, useEffect } from "react";
 
 function LoginForm() {
   const [isLoading, setIsLoading] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -41,7 +42,18 @@ function LoginForm() {
     const password = formData.get("password") as string;
 
     try {
+      setErrorMessage(null);
       const result = await login(email, password);
+
+      if (result?.error) {
+        if (result.error.message?.includes("Invalid credentials")) {
+          setErrorMessage("Invalid credentials. If you haven't registered an account yet, please sign up.");
+        } else {
+          setErrorMessage(result.error.message || "An error occurred during login.");
+        }
+        return;
+      }
+
       // login returns data which contains { user, session } if successful, but checking if error is handled.
       if (result?.user) {
         if (token) {
@@ -65,6 +77,7 @@ function LoginForm() {
       }
     } catch (error: any) {
       console.error("Email Login Error:", error?.message || error);
+      setErrorMessage(error?.message || "An unexpected error occurred.");
     } finally {
       setIsLoading(null);
     }
@@ -158,6 +171,15 @@ function LoginForm() {
               <span className="text-slate-600 text-[9px] font-bold uppercase tracking-[0.2em] whitespace-nowrap">Security Verified</span>
               <div className="h-px flex-1 bg-white/5" />
             </div>
+
+            {errorMessage && (
+              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-xl mb-4 text-xs font-medium flex items-start gap-2 animate-in fade-in duration-200">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-4 h-4 mt-0.5 shrink-0" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {errorMessage}
+              </div>
+            )}
 
             <form className="space-y-3" onSubmit={handleEmailLogin}>
               <div className="relative group">

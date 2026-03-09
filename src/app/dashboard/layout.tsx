@@ -22,6 +22,7 @@ export default function DashboardLayout({
 }) {
     const [user, setUser] = useState<any>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
     const pathname = usePathname();
@@ -61,6 +62,11 @@ export default function DashboardLayout({
         fetchUser();
     }, [router]);
 
+    // Close mobile menu when route changes
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [pathname]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -83,8 +89,16 @@ export default function DashboardLayout({
 
     return (
         <div className="flex h-screen w-full bg-[#0b0c10] text-slate-200 font-sans overflow-hidden">
+            {/* Mobile Sidebar Overlay */}
+            {isMobileMenuOpen && (
+                <div
+                    className="fixed inset-0 bg-black/60 z-40 md:hidden"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className="w-64 bg-[#12131a] flex flex-col border-r border-[#1f202b]">
+            <aside className={`fixed inset-y-0 right-0 md:left-0 md:right-auto z-50 w-64 bg-[#12131a] flex flex-col border-l md:border-l-0 md:border-r border-[#1f202b] transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? "translate-x-0" : "translate-x-full"}`}>
                 {/* Logo Area */}
                 <div className="p-6 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
@@ -219,8 +233,31 @@ export default function DashboardLayout({
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 overflow-y-auto">
-                <div className="h-full px-8 py-6">{children}</div>
+            <main className="flex-1 flex flex-col w-full min-w-0 overflow-hidden">
+                {/* Mobile Header */}
+                <header className="md:hidden flex items-center justify-between p-4 border-b border-[#1f202b] bg-[#12131a] shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-5 h-5 text-white" strokeWidth="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                                <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
+                            </svg>
+                        </div>
+                        <h1 className="font-bold text-lg text-white leading-tight">ApproveFlow</h1>
+                    </div>
+                    <button
+                        onClick={() => setIsMobileMenuOpen(true)}
+                        className="p-2 -mr-2 text-slate-400 hover:text-white"
+                    >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </header>
+
+                <div className="flex-1 overflow-y-auto">
+                    <div className="h-full px-4 py-4 md:px-8 md:py-6">{children}</div>
+                </div>
             </main>
         </div>
     );

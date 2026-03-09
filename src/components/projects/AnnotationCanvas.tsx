@@ -193,7 +193,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
             onWheel={handleWheel}
         >
             {/* Zoom Controls Overlay */}
-            <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+            <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200" onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
                 <div className="flex bg-[#12131a]/80 backdrop-blur-md border border-[#2a2b36] rounded-lg p-1 shadow-xl">
                     {!readOnly && (
                         <button
