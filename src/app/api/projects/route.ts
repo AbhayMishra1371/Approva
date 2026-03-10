@@ -24,7 +24,7 @@ export async function GET(request: Request) {
                     Query.orderDesc("$createdAt")
                 ]
             );
-            ownedProjects = ownedRes.documents.map((doc: any) => ({ ...doc, id: doc.$id }));
+            ownedProjects = ownedRes.documents.map((doc: any) => ({ ...doc, id: doc.$id, role: 'owner' }));
         } catch (e) {
             console.warn("Could not query owned projects directly:", e);
         }
@@ -34,13 +34,18 @@ export async function GET(request: Request) {
         // 2. Fetch collaborator links safely. Because 'user_id' might not be indexed in 'project_collaborators',
         // we fetch all collaborators and filter in memory if the direct query fails.
         let collabProjectIds: string[] = [];
+        let collabRoles: Record<string, string> = {};
+
         try {
             const collabsRes = await databases.listDocuments(
                 process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                 process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
                 [Query.equal("user_id", user.$id)]
             );
-            collabProjectIds = collabsRes.documents.map((doc: any) => doc.project_id);
+            collabsRes.documents.forEach((doc: any) => {
+                collabProjectIds.push(doc.project_id);
+                collabRoles[doc.project_id] = doc.role;
+            });
         } catch (err) {
             console.warn("Index missing for user_id on project_collaborators, falling back to manual filter.");
             // Fallback: fetch up to 5000 and filter
@@ -49,9 +54,12 @@ export async function GET(request: Request) {
                 process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
                 [Query.limit(5000)]
             );
-            collabProjectIds = allCollabs.documents
+            allCollabs.documents
                 .filter((doc: any) => doc.user_id === user.$id)
-                .map((doc: any) => doc.project_id);
+                .forEach((doc: any) => {
+                    collabProjectIds.push(doc.project_id);
+                    collabRoles[doc.project_id] = doc.role;
+                });
         }
 
         // 3. Fetch missing projects
@@ -70,7 +78,7 @@ export async function GET(request: Request) {
                 })
             );
             const results = await Promise.all(projectPromises);
-            collabProjects = results.filter(doc => doc !== null).map((doc: any) => ({ ...doc, id: doc.$id }));
+            collabProjects = results.filter(doc => doc !== null).map((doc: any) => ({ ...doc, id: doc.$id, role: collabRoles[doc.$id] || 'viewer' }));
         }
 
         let allProjects = [...ownedProjects, ...collabProjects];

@@ -37,6 +37,13 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 type Project = {
     id: string;
@@ -618,6 +625,39 @@ function CollaboratorsTab({ projectId, currentRole }: { projectId: string; curre
         if (currentRole) fetchCollaborators();
     }, [projectId, currentRole]);
 
+    const updateRole = async (collaboratorId: string, newRole: string) => {
+        try {
+            const { account } = createBrowserClient();
+            const { jwt } = await account.createJWT();
+
+            const res = await fetch(`/api/projects/collaborators`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${jwt}`
+                },
+                body: JSON.stringify({
+                    projectId,
+                    collaboratorId,
+                    newRole
+                })
+            });
+
+            if (res.ok) {
+                toast.success("Role updated successfully");
+                setCollaborators(collaborators.map(c =>
+                    c.id === collaboratorId ? { ...c, role: newRole } : c
+                ));
+            } else {
+                const data = await res.json();
+                toast.error(data.error || "Failed to update role");
+            }
+        } catch (err) {
+            console.error("Error updating role:", err);
+            toast.error("An error occurred while updating the role");
+        }
+    };
+
     if (isLoading) {
         return <div className="text-slate-500 text-sm animate-pulse">Loading collaborators...</div>;
     }
@@ -646,12 +686,30 @@ function CollaboratorsTab({ projectId, currentRole }: { projectId: string; curre
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider
-                                            ${c.role === 'owner' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
-                                                c.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                                                    'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
-                                            {c.role}
-                                        </span>
+                                        {(currentRole === 'owner' || currentRole === 'admin') && c.role !== 'owner' ? (
+                                            <Select
+                                                value={c.role}
+                                                onValueChange={(val) => updateRole(c.id, val)}
+                                            >
+                                                <SelectTrigger className={`h-8 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider border outline-none focus:ring-0 ${c.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                                                    'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                                    }`}>
+                                                    <SelectValue placeholder="Select role" />
+                                                </SelectTrigger>
+                                                <SelectContent className="bg-[#12131a] border-[#2a2b36] text-white">
+                                                    <SelectItem value="admin" className="focus:bg-[#1e1f2b] focus:text-white cursor-pointer">Admin</SelectItem>
+                                                    <SelectItem value="reviewer" className="focus:bg-[#1e1f2b] focus:text-white cursor-pointer">Reviewer</SelectItem>
+                                                    <SelectItem value="viewer" className="focus:bg-[#1e1f2b] focus:text-white cursor-pointer">Viewer</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        ) : (
+                                            <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider
+                                                ${c.role === 'owner' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                                                    c.role === 'admin' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                                        'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
+                                                {c.role}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             ))}

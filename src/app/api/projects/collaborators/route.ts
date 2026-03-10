@@ -44,24 +44,24 @@ export async function POST(request: Request) {
     }
 
     /* Ensure caller is collaborator */
-    const callerAccess = await databases.listDocuments(
+    const allAccess = await databases.listDocuments(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
       [
         Query.equal("project_id", projectId),
-        Query.equal("user_id", user.$id),
-        Query.limit(1),
       ]
     );
 
-    if (callerAccess.total === 0) {
+    const callerDoc = allAccess.documents.find((doc: any) => doc.user_id === user.$id);
+
+    if (!callerDoc) {
       return NextResponse.json(
         { error: "Unauthorized access to project" },
         { status: 403 }
       );
     }
 
-    const callerRole = callerAccess.documents[0].role;
+    const callerRole = callerDoc.role;
 
     if (callerRole !== "owner" && callerRole !== "admin") {
       return NextResponse.json(
@@ -186,57 +186,48 @@ export async function GET(request: Request) {
 
     const { databases } = await createAdminClient();
 
-    /* AUTO-SEED OWNER IF MISSING */
-    const existingAccess = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-      [
-        Query.equal("project_id", projectId),
-        Query.equal("user_id", user.$id),
-        Query.limit(1),
-      ]
-    );
-
-    if (existingAccess.total === 0) {
-      // Assume project creator → seed as owner
-      await databases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-        ID.unique(),
-        {
-          project_id: projectId,
-          user_id: user.$id,
-          role: "owner",
-        }
-      );
-    }
-
-    /* Re-check access */
-    const callerAccess = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-      [
-        Query.equal("project_id", projectId),
-        Query.equal("user_id", user.$id),
-        Query.limit(1),
-      ]
-    );
-
-    if (callerAccess.total === 0) {
-      return NextResponse.json(
-        { error: "Unauthorized access to project" },
-        { status: 403 }
-      );
-    }
-
-    const callerRole = callerAccess.documents[0].role;
-
     /* Fetch collaborators */
     const collabsRes = await databases.listDocuments(
       process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
       process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
       [Query.equal("project_id", projectId)]
     );
+
+    /* Check access and AUTO-SEED OWNER IF MISSING */
+    const existingAccess = collabsRes.documents.find((doc: any) => doc.user_id === user.$id);
+
+    let callerRole = "";
+
+    if (!existingAccess) {
+      // Check if the caller is the actual project creator
+      const project = await databases.getDocument(
+        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+        process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
+        projectId
+      );
+
+      if (project.owner_id === user.$id) {
+        // Assume project creator → seed as owner
+        await databases.createDocument(
+          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+          process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
+          ID.unique(),
+          {
+            project_id: projectId,
+            user_id: user.$id,
+            role: "owner",
+          }
+        );
+        callerRole = "owner";
+      } else {
+        return NextResponse.json(
+          { error: "Unauthorized access to project" },
+          { status: 403 }
+        );
+      }
+    } else {
+      callerRole = existingAccess.role;
+    }
 
     const collaborators = collabsRes.documents.map((doc) => ({
       id: doc.$id,
@@ -274,6 +265,77 @@ export async function GET(request: Request) {
     });
   } catch (error: any) {
     console.error("Collaborator GET Error:", error?.message || error);
+    return NextResponse.json(
+      { error: error?.message || "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH-update collaborator role
+export async function PATCH(request: Request) {
+  try {
+    const { user } = await getLoggedInUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { databases } = await createAdminClient();
+    const { projectId, collaboratorId, newRole } = await request.json();
+
+    if (!projectId || !collaboratorId || !newRole) {
+      return NextResponse.json(
+        { error: "Missing required fields (projectId, collaboratorId, newRole)" },
+        { status: 400 }
+      );
+    }
+
+    if (!["owner", "admin", "reviewer", "viewer"].includes(newRole)) {
+      return NextResponse.json(
+        { error: "Invalid role specified" },
+        { status: 400 }
+      );
+    }
+
+    // Verify caller is owner or admin
+    const allAccess = await databases.listDocuments(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
+      [
+        Query.equal("project_id", projectId),
+      ]
+    );
+
+    const callerDoc = allAccess.documents.find((doc: any) => doc.user_id === user.$id);
+
+    if (!callerDoc) {
+      return NextResponse.json(
+        { error: "Unauthorized access to project" },
+        { status: 403 }
+      );
+    }
+
+    const callerRole = callerDoc.role;
+    if (callerRole !== "owner" && callerRole !== "admin") {
+      return NextResponse.json(
+        { error: "Insufficient permissions to modify roles" },
+        { status: 403 }
+      );
+    }
+
+    // Update the collaborator document
+    const updatedCollaborator = await databases.updateDocument(
+      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
+      collaboratorId,
+      {
+        role: newRole,
+      }
+    );
+
+    return NextResponse.json({ success: true, collaborator: updatedCollaborator });
+  } catch (error: any) {
+    console.error("Collaborator PATCH Error:", error?.message || error);
     return NextResponse.json(
       { error: error?.message || "Internal Server Error" },
       { status: 500 }

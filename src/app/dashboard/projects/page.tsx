@@ -36,6 +36,7 @@ interface Project {
     status: string;
     owner_id: string;
     created_at: string;
+    role?: string;
 };
 
 export default function ProjectsPage() {
@@ -165,28 +166,30 @@ function ProjectCard({ project, onDelete }: { project: Project; onDelete?: (id: 
                         </div>
                     </div>
                     <div className="flex items-center gap-1 relative z-10" onClick={(e) => e.preventDefault()}>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <button
-                                    className="text-slate-500 hover:text-rose-400 p-1.5 rounded-md hover:bg-rose-500/10 transition-colors"
-                                    title="Delete Project"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="bg-[#12131a] border-[#1f202b] text-white">
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete project?</AlertDialogTitle>
-                                    <AlertDialogDescription className="text-slate-400">
-                                        Are you sure you want to delete {project.name}? This action cannot be undone.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel className="bg-[#1e1f2b] border-[#2a2b36] hover:bg-[#2a2b36] hover:text-white text-slate-300">Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => onDelete && onDelete(project.id)} className="bg-rose-500 hover:bg-rose-600 text-white">Delete</AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
+                        {(project.role === 'owner' || project.role === 'admin') && (
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <button
+                                        className="text-slate-500 hover:text-rose-400 p-1.5 rounded-md hover:bg-rose-500/10 transition-colors"
+                                        title="Delete Project"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="bg-[#12131a] border-[#1f202b] text-white">
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete project?</AlertDialogTitle>
+                                        <AlertDialogDescription className="text-slate-400">
+                                            Are you sure you want to delete {project.name}? This action cannot be undone.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel className="bg-[#1e1f2b] border-[#2a2b36] hover:bg-[#2a2b36] hover:text-white text-slate-300">Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => onDelete && onDelete(project.id)} className="bg-rose-500 hover:bg-rose-600 text-white">Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        )}
                         <button className="text-slate-500 hover:text-white p-1.5 rounded-md hover:bg-[#1e1f2b] transition-colors">
                             <MoreVertical className="w-4 h-4" />
                         </button>
