@@ -184,7 +184,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { databases } = await createAdminClient();
+    const { databases, users } = await createAdminClient();
 
     /* Fetch collaborators */
     const collabsRes = await databases.listDocuments(
@@ -229,15 +229,29 @@ export async function GET(request: Request) {
       callerRole = existingAccess.role;
     }
 
-    const collaborators = collabsRes.documents.map((doc) => ({
-      id: doc.$id,
-      user_id: doc.user_id,
-      role: doc.role,
-      created_at: doc.$createdAt,
-      email:
-        doc.user_id === user.$id
-          ? user.email
-          : "User_" + doc.user_id.substring(0, 4),
+    const collaborators = await Promise.all(collabsRes.documents.map(async (doc) => {
+      let email = "User_" + doc.user_id.substring(0, 4);
+      let name = "Unknown User";
+      if (doc.user_id === user.$id) {
+        email = user.email;
+        name = user.name || user.email.split("@")[0] || "User";
+      } else {
+        try {
+          const targetUser = await users.get(doc.user_id);
+          email = targetUser.email || email;
+          name = targetUser.name || targetUser.email.split("@")[0] || "User";
+        } catch (e) {
+          console.error("Failed to fetch user:", doc.user_id);
+        }
+      }
+      return {
+        id: doc.$id,
+        user_id: doc.user_id,
+        role: doc.role,
+        created_at: doc.$createdAt,
+        email,
+        name
+      };
     }));
 
     /* Fetch invites if admin/owner */

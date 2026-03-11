@@ -1,10 +1,10 @@
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { ID } from "appwrite";
 
-export const signUp = async (email: string, password: string) => {
+export const signUp = async (email: string, password: string, name?: string) => {
     const { account } = createBrowserClient();
     try {
-        const user = await account.create(ID.unique(), email, password);
+        const user = await account.create(ID.unique(), email, password, name);
         return { user, error: null };
     } catch (error: any) {
         console.error("SignUp Error:", error?.message || error);

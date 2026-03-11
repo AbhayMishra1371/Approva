@@ -39,12 +39,25 @@ function SignupForm() {
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
+    const name = formData.get("name") as string;
 
     try {
-      const result = await signUp(email, password);
+      let result = await signUp(email, password, name);
+
+      // If user already exists, try to log them in directly
+      if (result?.error && result.error.message.includes("already exists")) {
+        // Log the user in
+        const loginResult = await login(email, password);
+        if (loginResult.error) {
+          throw loginResult.error;
+        }
+        result = { user: loginResult.user, error: null }; // Mock a successful signup result
+      } else if (result?.error) {
+        throw result.error;
+      }
 
       if (result?.user) {
-        // We must log in to establish the session after signing up
+        // We must log in to establish the session after signing up (unless we just did above, but `login` safely handles existing sessions or creates an email/password session)
         await login(email, password);
 
         if (token) {
@@ -72,6 +85,7 @@ function SignupForm() {
       }
     } catch (error: any) {
       console.error("Email Signup Error:", error?.message || error);
+      // Optional: you could add `toast.error(error?.message || "An error occurred during signup")` here if you have `toast` imported
     } finally {
       setIsLoading(null);
     }
@@ -167,6 +181,16 @@ function SignupForm() {
             </div>
 
             <form className="space-y-3" onSubmit={handleEmailSignup}>
+              <div className="relative group">
+                <UserPlus className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 group-focus-within:text-primary transition-colors" />
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Full Name"
+                  className="w-full rounded-xl py-3 pl-12 pr-4 transition-all font-medium text-xs placeholder:text-slate-600 neon-input"
+                  required
+                />
+              </div>
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 group-focus-within:text-primary transition-colors" />
                 <input

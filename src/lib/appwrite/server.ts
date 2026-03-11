@@ -1,5 +1,5 @@
 
-import { Client, Account, Databases, Storage } from 'node-appwrite';
+import { Client, Account, Databases, Storage, Users } from 'node-appwrite';
 import { headers } from 'next/headers';
 
 export async function createSessionClient() {
@@ -39,9 +39,11 @@ export async function createAdminClient() {
         get account() { return new Account(client); },
         get databases() { return new Databases(client); },
         get storage() { return new Storage(client); },
+        get users() { return new Users(client); },
         client
     };
 }
+
 
 export async function getLoggedInUser() {
     try {

@@ -82,10 +82,10 @@ export default function DashboardLayout({
         router.push("/");
     };
 
-    const userInitial = user?.email ? user.email.charAt(0).toUpperCase() : "U";
-    const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
-    const userRole = user?.user_metadata?.role || "Member";
-    const userAvatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
+    const userName = user?.name || user?.email?.split("@")[0] || "User";
+    const userInitial = userName.charAt(0).toUpperCase();
+    const userRole = user?.prefs?.role || "Member";
+    const userAvatar = user?.prefs?.avatar_url || user?.prefs?.picture;
 
     return (
         <div className="flex h-screen w-full bg-[#0b0c10] text-slate-200 font-sans overflow-hidden">
