@@ -64,6 +64,7 @@ type Asset = {
     version: string;
     status: string;
     url: string;
+    file_path: string;
 };
 
 export default function ProjectDetailPage() {
@@ -236,6 +237,27 @@ export default function ProjectDetailPage() {
         }
     };
 
+    const handleDownload = (filePath: string) => {
+        try {
+            const { storage } = createBrowserClient();
+            const downloadUrl = storage.getFileDownload(
+                process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
+                filePath
+            ).toString();
+
+            // Create a hidden link and click it to trigger download
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error("Download error:", error);
+            toast.error("Failed to start download.");
+        }
+    };
+
     return (
         <div className="flex flex-col gap-6 w-full h-full pb-8">
             {/* Header Area */}
@@ -392,6 +414,16 @@ export default function ProjectDetailPage() {
                                                     >
                                                         <Maximize2 className="w-5 h-5" />
                                                     </Link>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDownload(asset.file_path);
+                                                        }}
+                                                        className="w-10 h-10 rounded-full bg-slate-500/10 flex items-center justify-center text-slate-400 border border-slate-500/20 hover:bg-slate-500 hover:text-white transition-colors shadow-lg"
+                                                        title="Download Asset"
+                                                    >
+                                                        <Download className="w-5 h-5" />
+                                                    </button>
                                                     {(role === 'owner' || role === 'admin') && (
                                                         <AlertDialog>
                                                             <AlertDialogTrigger asChild>
