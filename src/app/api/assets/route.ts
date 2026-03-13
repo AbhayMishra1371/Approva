@@ -23,7 +23,11 @@ export async function GET(request: Request) {
                     Query.equal("owner_id", user.$id)
                 ]
             );
-            ownedProjects = ownedRes.documents.map((doc: any) => ({ ...doc, id: doc.$id }));
+            ownedProjects = ownedRes.documents
+                .filter((doc: any) => doc.owner_id === user.$id)
+                .map((doc: any) => ({ ...doc, id: doc.$id }));
+            
+            console.log(`[DEBUG] Assets API: Owned projects for ${user.$id}: ${ownedProjects.length} (Total raw: ${ownedRes.documents.length})`);
         } catch (e) {
             console.warn("Could not query owned projects:", e);
         }
@@ -38,9 +42,17 @@ export async function GET(request: Request) {
                 process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
                 [Query.equal("user_id", user.$id)]
             );
-            collabsRes.documents.forEach((doc: any) => {
+            
+            const filteredCollabs = collabsRes.documents.filter((doc: any) => doc.user_id === user.$id);
+            
+            if (filteredCollabs.length !== collabsRes.documents.length) {
+                console.warn(`[SECURITY ALERT] Assets API: Collaborator query returned ${collabsRes.documents.length} docs, but only ${filteredCollabs.length} matched user_id ${user.$id}.`);
+            }
+
+            filteredCollabs.forEach((doc: any) => {
                 collabProjectIds.push(doc.project_id);
             });
+            console.log(`[DEBUG] Assets API: Collaborator project IDs: ${collabProjectIds.length}`);
         } catch (err) {
             // Fallback
             const allCollabs = await databases.listDocuments(
