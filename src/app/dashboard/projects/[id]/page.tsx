@@ -353,8 +353,7 @@ export default function ProjectDetailPage() {
                             <div className="flex items-center justify-between gap-2 sm:gap-4 mb-6">
                                 <h2 className="text-lg font-bold text-white shrink-0">All Assets</h2>
                                 <div className="flex gap-2 items-center justify-end flex-1">
-                                    <div className="hidden sm:block w-64 h-9 bg-[#1e1f2b] rounded-lg border border-[#2a2b36]" />
-                                    <div className="hidden sm:block w-9 h-9 bg-[#1e1f2b] rounded-lg border border-[#2a2b36]" />
+
                                     {(role === 'owner' || role === 'admin') && (
                                         <button
                                             onClick={() => document.querySelector<HTMLInputElement>('input[type="file"]')?.click()}
