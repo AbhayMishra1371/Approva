@@ -34,10 +34,14 @@ export async function POST(request: Request) {
 
         const inviteObj = invitesRes.documents[0];
 
-        // Email validation removed to allow token-based acceptance
+        // 2. Email validation - strictly enforce that the logged in user matches the invite
         if (inviteObj.email !== user.email) {
-            console.log("INVITE EMAIL DIFFERENT FROM LOGGED IN USER:", { inviteEmail: inviteObj.email, userEmail: user.email });
-            // Continuing anyway since token matched
+            console.log("INVITE EMAIL MISMATCH:", { inviteEmail: inviteObj.email, userEmail: user.email });
+            return NextResponse.json({ 
+                error: "This invitation was sent to a different email address than the one you are currently logged in with.",
+                expectedEmail: inviteObj.email,
+                currentUserEmail: user.email
+            }, { status: 403 });
         }
 
         // 2. Check if already a collaborator

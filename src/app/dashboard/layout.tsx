@@ -46,13 +46,22 @@ export default function DashboardLayout({
                             },
                             body: JSON.stringify({ token: pendingInviteToken })
                         });
+                        
                         if (res.ok) {
                             const data = await res.json();
                             localStorage.removeItem("pendingInviteToken");
                             router.push(`/dashboard/projects/${data.project_id}`);
+                        } else if (res.status === 403) {
+                            // Email mismatch - redirect to the specialized accept page to show the mismatch UI
+                            // Keep the token in localStorage so it can be picked up after a successful switch
+                            router.push(`/invitations/accept?token=${pendingInviteToken}`);
+                        } else {
+                            // Other error (e.g. 404), clear it
+                            localStorage.removeItem("pendingInviteToken");
                         }
                     } catch (error) {
                         console.error("Failed to accept pending invite", error);
+                        localStorage.removeItem("pendingInviteToken");
                     }
                 }
             } else {

@@ -79,6 +79,11 @@ function SignupForm() {
             localStorage.removeItem("pendingInviteToken");
             router.push(`/dashboard/projects/${data.project_id}`);
             return;
+          } else if (res.status === 403) {
+            // ... (keeping mismatch logic)
+            localStorage.removeItem("pendingInviteToken");
+            router.push(`/invitations/accept?token=${token}`);
+            return;
           }
         }
         router.push("/dashboard");
@@ -103,9 +108,13 @@ function SignupForm() {
         localStorage.setItem("pendingInviteToken", token);
       }
 
+      const successUrl = token 
+        ? `${window.location.origin}/invitations/accept?token=${token}`
+        : `${window.location.origin}/dashboard`;
+
       account.createOAuth2Session(
         oauthProvider,
-        `${window.location.origin}/dashboard`,
+        successUrl,
         `${window.location.origin}/signup`
       );
     } catch (error: any) {

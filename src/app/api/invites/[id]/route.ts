@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/appwrite/server";
+import { Query } from "node-appwrite";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ id: string }> } // We'll keep the param name 'id' for the folder structure but treat it as a token
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id: token } = await params;
@@ -20,8 +21,8 @@ export async function GET(
             process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
             process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID!,
             [
-                import("node-appwrite").then(m => m.Query.equal("token", token))
-            ] as any // Dynamic import for Query since it wasn't at the top
+                Query.equal("token", token)
+            ]
         );
 
         if (invitesRes.total === 0) {
