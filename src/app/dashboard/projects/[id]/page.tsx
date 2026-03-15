@@ -154,14 +154,23 @@ export default function ProjectDetailPage() {
 
     const handleDeleteProject = async (projectId: string) => {
         try {
-            const { databases } = createBrowserClient();
-            await databases.deleteDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-                projectId
-            );
-            router.push("/dashboard/projects");
-            toast.success("Project deleted successfully");
+            const { account } = createBrowserClient();
+            const { jwt } = await account.createJWT();
+            
+            const res = await fetch(`/api/projects/${projectId}`, {
+                method: "DELETE",
+                headers: {
+                    "Authorization": `Bearer ${jwt}`
+                }
+            });
+
+            if (res.ok) {
+                router.push("/dashboard/projects");
+                toast.success("Project deleted successfully");
+            } else {
+                const data = await res.json();
+                toast.error(data.error || "Failed to delete project");
+            }
         } catch (err) {
             console.error("Error deleting project:", err);
             toast.error("An error occurred while deleting the project.");
