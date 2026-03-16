@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Approva
 
-## Getting Started
+Built for **High-Stakes Asset Approval**. Control the chaos with a Neo-Tech interface designed for rapid sign-offs and visual clarity.
 
-First, run the development server:
+## 🚀 Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+-   **Live Reviews**: Instant sync for your global creative team.
+-   **Version Control**: Track every iteration of your assets securely.
+-   **Asset Grid**: Beautiful galleries for all your project files.
+-   **Enterprise Security**: Bank-grade encryption for your creative IP.
+-   **Frame-Accurate Video Feedback**: (In Development) Precise annotations on video assets.
+-   **Global Asset Search**: Quickly find what you need across all projects.
+-   **Custom Approval Workflows**: Tailor the review process to your team's needs.
+
+## 🛠 Tech Stack
+
+-   **Frontend**: [Next.js 16](https://nextjs.org/) (App Router), TypeScript
+-   **Backend-as-a-Service**: [Appwrite](https://appwrite.io/)
+-   **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
+-   **Animations**: [GSAP](https://greensock.com/gsap/)
+-   **UI Components**: [Radix UI](https://www.radix-ui.com/), [Lucide React](https://lucide.dev/)
+
+## 🏁 Getting Started
+
+### Prerequisites
+
+-   Node.js 18+ and npm/pnpm/yarn/bun.
+-   An Appwrite project instance.
+
+### Installation
+
+1.  Clone the repository:
+    ```bash
+    git clone <repository-url>
+    cd Approva
+    ```
+
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+
+3.  Set up environment variables:
+    Create a `.env.local` file in the root directory and add your Appwrite configuration:
+    ```env
+    NEXT_PUBLIC_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
+    NEXT_PUBLIC_APPWRITE_PROJECT_ID=your_project_id
+    APPWRITE_API_KEY=your_api_key
+    ```
+
+4.  Run the development server:
+    ```bash
+    npm run dev
+    ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📁 Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+-   `src/app`: Next.js App Router pages and API routes.
+-   `src/components`: Reusable UI components and section layouts.
+-   `src/lib`: Utility functions and Appwrite client/server logic.
+-   `src/providers`: React context providers (e.g., Auth, Theme).
+-   `Schema`: Database schema definitions (SQL).
 
-## Learn More
+## 📄 License
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is private and proprietary.
