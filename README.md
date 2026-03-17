@@ -26,6 +26,7 @@ Built for **High-Stakes Asset Approval**. Control the chaos with a Neo-Tech inte
 
 -   Node.js 18+ and npm/pnpm/yarn/bun.
 -   An Appwrite project instance.
+-   Redux Toolkit for state management.
 
 ### Installation
 
