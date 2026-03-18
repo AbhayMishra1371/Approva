@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { UploadCloud, File, X, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
-import { ID } from "appwrite";
+import { ID, Permission, Role } from "appwrite";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/appwrite/client";
 
@@ -70,7 +70,7 @@ export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle }: AssetU
             ).toString();
 
             // 3. Save metadata to Database directly
-            await databases.createDocument(
+            const assetDoc = await databases.createDocument(
                 process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                 process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
                 ID.unique(),
@@ -84,6 +84,27 @@ export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle }: AssetU
                     version: "v1",
                     status: "Pending"
                 }
+            );
+
+            // 4. Create Activity Log
+            await databases.createDocument(
+                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
+                ID.unique(),
+                {
+                    project_id: projectId,
+                    user_id: user.$id,
+                    user_email: user.email,
+                    action: "uploaded_asset",
+                    entity_type: "asset",
+                    entity_id: assetDoc.$id,
+                    metadata: JSON.stringify({ file_name: file.name })
+                },
+                [
+                    Permission.read(Role.users()),
+                    Permission.update(Role.user(user.$id)),
+                    Permission.delete(Role.user(user.$id))
+                ]
             );
 
             setProgress(100);

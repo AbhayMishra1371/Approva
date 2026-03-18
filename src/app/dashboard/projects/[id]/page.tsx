@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
     ArrowLeft,
-    FolderIcon,
     Image as ImageIcon,
     Users,
     Activity,
@@ -24,7 +23,8 @@ import {
 import { useParams, useRouter } from "next/navigation";
 import { AssetUpload } from "@/components/projects/AssetUpload";
 import { createBrowserClient } from "@/lib/appwrite/client";
-import { Query } from "appwrite";
+import { Query, Permission, Role, ID } from "appwrite";
+import { ActivityLog } from "@/components/projects/ActivityLog";
 import { toast } from "sonner";
 import {
     AlertDialog,
@@ -156,7 +156,7 @@ export default function ProjectDetailPage() {
         try {
             const { account } = createBrowserClient();
             const { jwt } = await account.createJWT();
-            
+
             const res = await fetch(`/api/projects/${projectId}`, {
                 method: "DELETE",
                 headers: {
@@ -231,9 +231,37 @@ export default function ProjectDetailPage() {
 
             if (res.ok) {
                 setIsInviteModalOpen(false);
+                const invitedEmail = inviteEmail; // Store for logging
                 setInviteEmail("");
                 setInviteRole("reviewer");
                 toast.success("Invitation sent successfully!");
+
+                // Create Activity Log
+                try {
+                    const { databases, account } = createBrowserClient();
+                    const user = await account.get();
+                    await databases.createDocument(
+                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                        process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
+                        ID.unique(),
+                        {
+                            project_id: id,
+                            user_id: user.$id,
+                            user_email: user.email,
+                            action: "invited_user",
+                            entity_type: "invite",
+                            entity_id: id, // Linking to project as invite doesn't have a specific ID here
+                            metadata: JSON.stringify({ invited_email: invitedEmail })
+                        },
+                        [
+                            Permission.read(Role.users()),
+                            Permission.update(Role.user(user.$id)),
+                            Permission.delete(Role.user(user.$id))
+                        ]
+                    );
+                } catch (logError) {
+                    console.error("Failed to log invite activity:", logError);
+                }
             } else {
                 const data = await res.json();
                 toast.error(data.error || "Failed to send invitation.");
@@ -498,8 +526,15 @@ export default function ProjectDetailPage() {
                     </div>
                 )}
 
+                {/* Activity Log Tab */}
+                {activeTab === "activity" && (
+                    <div className="flex-1 w-full overflow-y-auto">
+                        <ActivityLog projectId={id} />
+                    </div>
+                )}
+
                 {/* Other tabs placeholders */}
-                {activeTab !== "assets" && activeTab !== "collaborators" && (
+                {activeTab !== "assets" && activeTab !== "collaborators" && activeTab !== "activity" && (
                     <div className="flex-1 flex items-center justify-center p-12">
                         <div className="text-center">
                             <h3 className="text-xl font-bold text-white mb-2 capitalize">{activeTab}</h3>

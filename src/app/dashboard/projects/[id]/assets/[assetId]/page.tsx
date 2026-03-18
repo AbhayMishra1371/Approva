@@ -16,7 +16,7 @@ import {
     Send
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/appwrite/client";
-import { Query, ID } from "appwrite";
+import { Query, ID, Permission, Role } from "appwrite";
 import { toast } from "sonner";
 import { AnnotationCanvas, Annotation } from "@/components/projects/AnnotationCanvas";
 import { CommentThread, Comment } from "@/components/projects/CommentThread";
@@ -62,6 +62,7 @@ export default function AssetDetailPage() {
 
     // Role state
     const [role, setRole] = useState<'owner' | 'admin' | 'reviewer' | 'viewer' | null>(null);
+    console.log("DEBUG: UI rendering with role:", role, "readOnly calculated as:", role === 'viewer');
 
     const colors = [
         { name: 'Purple', value: '#a855f7' },
@@ -154,6 +155,7 @@ export default function AssetDetailPage() {
                 });
                 if (res.ok) {
                     const data = await res.json();
+                    console.log("DEBUG: Role API response:", data);
                     if (data.callerRole) {
                         setRole(data.callerRole as 'owner' | 'admin' | 'reviewer' | 'viewer');
                     } else {
@@ -166,7 +168,9 @@ export default function AssetDetailPage() {
                 console.error("Error fetching user role", error);
             }
         };
-        fetchRole();
+        if (projectId) {
+            fetchRole();
+        }
     }, [projectId]);
 
     console.log("DEBUG - Asset Render State: ", { role, assetStatus: asset?.status });
@@ -223,6 +227,33 @@ export default function AssetDetailPage() {
             setAnnotations([...annotations, added]);
             setSelectedAnnotation(added);
             setComments([]); // New annotation has no comments
+
+            // Create Activity Log
+            try {
+                const { account } = createBrowserClient();
+                const user = await account.get();
+                await databases.createDocument(
+                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
+                    ID.unique(),
+                    {
+                        project_id: projectId,
+                        user_id: user.$id,
+                        user_email: user.email,
+                        action: "added_annotation",
+                        entity_type: "annotation",
+                        entity_id: doc.$id,
+                        metadata: JSON.stringify({ file_name: asset?.file_name })
+                    },
+                    [
+                        Permission.read(Role.users()),
+                        Permission.update(Role.user(user.$id)),
+                        Permission.delete(Role.user(user.$id))
+                    ]
+                );
+            } catch (logError) {
+                console.error("Failed to log annotation activity:", logError);
+            }
         } catch (error) {
             console.error("Failed to save annotation:", error);
             toast.error("Failed to save annotation. Make sure the 'annotations' collection exists.");
@@ -256,6 +287,31 @@ export default function AssetDetailPage() {
                 text: text,
                 created_at: new Date().toISOString()
             }]);
+
+            // Create Activity Log
+            try {
+                await databases.createDocument(
+                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
+                    ID.unique(),
+                    {
+                        project_id: projectId,
+                        user_id: user.$id,
+                        user_email: user.email,
+                        action: "added_comment",
+                        entity_type: "comment",
+                        entity_id: doc.$id,
+                        metadata: JSON.stringify({ file_name: asset?.file_name })
+                    },
+                    [
+                        Permission.read(Role.users()),
+                        Permission.update(Role.user(user.$id)),
+                        Permission.delete(Role.user(user.$id))
+                    ]
+                );
+            } catch (logError) {
+                console.error("Failed to log comment activity:", logError);
+            }
         } catch (e) {
             console.error("Failed to save comment:", e);
             toast.error("Failed to save comment.");
@@ -418,6 +474,34 @@ export default function AssetDetailPage() {
                         text: comment,
                         created_at: new Date().toISOString()
                     }]);
+
+                    // Create Activity Log ONLY if approved
+                    if (newStatus === 'approved') {
+                        try {
+                            const { databases } = createBrowserClient();
+                            await databases.createDocument(
+                                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
+                                ID.unique(),
+                                {
+                                    project_id: projectId,
+                                    user_id: user.$id,
+                                    user_email: user.email,
+                                    action: "approved_asset",
+                                    entity_type: "asset",
+                                    entity_id: assetId,
+                                    metadata: JSON.stringify({ file_name: data.asset?.file_name || asset?.file_name })
+                                },
+                                [
+                                    Permission.read(Role.users()),
+                                    Permission.update(Role.user(user.$id)),
+                                    Permission.delete(Role.user(user.$id))
+                                ]
+                            );
+                        } catch (logError) {
+                            console.error("Failed to log approval activity:", logError);
+                        }
+                    }
                 }
                 toast.success(`Asset marked as ${newStatus.replace('_', ' ')}`);
             } else {

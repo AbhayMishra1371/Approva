@@ -38,6 +38,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
     renderPopup,
     readOnly = false
 }) => {
+    console.log("DEBUG: AnnotationCanvas props:", { assetUrl, assetType, annotationsLength: annotations?.length, readOnly });
     const containerRef = useRef<HTMLDivElement>(null);
     const innerRef = useRef<HTMLDivElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -105,6 +106,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         const x = ((e.clientX - actualLeft) / actualWidth) * 100;
         const y = ((e.clientY - actualTop) / actualHeight) * 100;
 
+        console.log("DEBUG: Calculated coords:", { x, y, clientX: e.clientX, clientY: e.clientY });
         return { x, y };
     };
 
@@ -124,6 +126,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         if (readOnly) return;
 
         const coords = getCoordinatesFromEvent(e);
+        console.log("DEBUG: handleMouseDown coords:", coords);
         if (!coords) return;
 
         setIsDrawing(true);
@@ -175,8 +178,11 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         const distance = Math.sqrt(Math.pow(coords.x - startPos.x, 2) + Math.pow(coords.y - startPos.y, 2));
 
         if (distance < 2) {
+            console.log("DEBUG: distance small enough for click, setting draft pin at:", startPos);
             setDraftPin(startPos);
             setDraftName("New Annotation");
+        } else {
+            console.log("DEBUG: distance too large for click:", distance);
         }
 
         setCurrentRect(null);
