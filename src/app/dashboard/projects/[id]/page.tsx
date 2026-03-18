@@ -372,10 +372,6 @@ export default function ProjectDetailPage() {
                             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Folders</h3>
                             <div className="space-y-1">
                                 <FolderItem name="All Assets" active />
-                                <FolderItem name="Images" />
-                                <FolderItem name="Videos" />
-                                <FolderItem name="Documents" />
-                                <FolderItem name="Brand Guidelines" />
                             </div>
                         </div>
 
