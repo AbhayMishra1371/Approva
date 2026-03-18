@@ -367,14 +367,7 @@ export default function ProjectDetailPage() {
             <div className="flex-1 bg-[#12131a] border border-[#1f202b] rounded-xl flex flex-col md:flex-row overflow-hidden min-h-[600px] md:min-h-0">
                 {activeTab === "assets" && (
                     <>
-                        {/* Folder Tree Placeholder */}
-                        <div className="w-full md:w-64 border-b md:border-b-0 md:border-r border-[#1f202b] p-4 flex flex-col shrink-0">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Folders</h3>
-                            <div className="space-y-1">
-                                <FolderItem name="All Assets" active />
-                            </div>
-                        </div>
-
+                        {/* Asset Grid Placeholder */}
                         {/* Asset Grid Placeholder */}
                         <div className="flex-1 p-4 md:p-6 flex flex-col min-w-0 overflow-y-auto">
                             <div className="flex items-center justify-between gap-2 sm:gap-4 mb-6">
@@ -619,15 +612,6 @@ function TabButton({
     );
 }
 
-function FolderItem({ name, active = false }: { name: string; active?: boolean }) {
-    return (
-        <div className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors ${active ? "bg-purple-500/10 text-purple-400 font-medium" : "text-slate-400 hover:bg-[#1e1f2b] hover:text-white"
-            }`}>
-            <FolderIcon className={`w-4 h-4 ${active ? "fill-purple-500/20" : ""}`} />
-            <span className="text-sm">{name}</span>
-        </div>
-    );
-}
 
 function CollaboratorsTab({ projectId, currentRole }: { projectId: string; currentRole: string | null }) {
     const [collaborators, setCollaborators] = useState<any[]>([]);
