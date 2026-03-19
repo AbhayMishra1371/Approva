@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { 
-    User, 
-    Mail, 
-    Calendar, 
-    IdCard, 
-    Camera, 
-    Edit2, 
-    Check, 
+import {
+    User,
+    Mail,
+    Calendar,
+    IdCard,
+    Camera,
+    Edit2,
+    Check,
     X,
     Upload,
     MessageSquare,
@@ -35,7 +35,7 @@ export default function ProfilePage() {
                 if (currentUser) {
                     setUser(currentUser);
                     setNewName(currentUser.name);
-                    
+
                     // Fetch user activity
                     const jwt = await getJwt();
                     const res = await fetch(`/api/activity?userId=${currentUser.$id}`, {
@@ -146,20 +146,20 @@ export default function ProfilePage() {
     const userInitial = user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase();
 
     return (
-        <div className="max-w-5xl mx-auto py-8 px-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <header className="mb-10">
-                <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">Your Profile</h1>
-                <p className="text-slate-400">Manage your account settings and view your recent activity.</p>
+        <div className="h-[calc(100vh-160px)] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <header className="mb-6 shrink-0">
+                <h1 className="text-3xl font-bold text-white mb-1 tracking-tight">Your Profile</h1>
+                <p className="text-slate-400 text-sm">Manage your account settings and view your recent activity.</p>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 min-h-0">
                 {/* Left Column: Basic & Account Info */}
-                <div className="lg:col-span-4 space-y-6">
+                <div className="lg:col-span-4 space-y-6 overflow-y-auto custom-scrollbar pr-2 lg:overflow-visible">
                     {/* Profile Summary Card */}
                     <div className="bg-[#12131a] border border-[#1f202b] rounded-2xl p-8 flex flex-col items-center text-center shadow-xl relative overflow-hidden group">
                         {/* Decorative Background */}
                         <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-purple-500/10 to-transparent -z-10"></div>
-                        
+
                         <div className="relative mb-6">
                             <div className="w-28 h-28 rounded-full bg-[#1e1f2b] border-4 border-[#0b0c10] shadow-2xl flex items-center justify-center overflow-hidden">
                                 {userAvatar ? (
@@ -168,7 +168,7 @@ export default function ProfilePage() {
                                     <span className="text-4xl font-bold text-purple-400">{userInitial}</span>
                                 )}
                             </div>
-                            <button 
+                            <button
                                 onClick={handleAvatarChange}
                                 className="absolute bottom-1 right-1 bg-purple-600 p-2 rounded-full text-white shadow-lg hover:bg-purple-700 transition-all hover:scale-110 active:scale-95"
                                 title="Change Avatar"
@@ -176,13 +176,13 @@ export default function ProfilePage() {
                                 <Camera className="w-4 h-4" />
                             </button>
                         </div>
-                        
+
                         <div className="w-full space-y-4">
                             <div className="space-y-1">
                                 {isEditingName ? (
                                     <div className="flex items-center gap-2 justify-center">
-                                        <input 
-                                            type="text" 
+                                        <input
+                                            type="text"
                                             autoFocus
                                             value={newName}
                                             onChange={(e) => setNewName(e.target.value)}
@@ -199,8 +199,8 @@ export default function ProfilePage() {
                                 ) : (
                                     <div className="flex items-center gap-2 justify-center">
                                         <h2 className="text-2xl font-bold text-white tracking-tight">{user.name}</h2>
-                                        <button 
-                                            onClick={() => setIsEditingName(true)} 
+                                        <button
+                                            onClick={() => setIsEditingName(true)}
                                             className="p-1 text-slate-500 hover:text-white transition-colors"
                                             title="Edit Name"
                                         >
@@ -230,7 +230,7 @@ export default function ProfilePage() {
                                     <p className="text-xs text-slate-300 font-mono truncate">{user.$id}</p>
                                 </div>
                             </div>
-                            
+
                             <div className="flex items-center gap-4 bg-[#1e1f2b]/30 p-4 rounded-xl border border-transparent hover:border-[#2a2b36] hover:bg-[#1e1f2b]/50 transition-all">
                                 <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
                                     <Calendar className="w-5 h-5 text-amber-400" />
@@ -245,9 +245,9 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Right Column: Activity Feed */}
-                <div className="lg:col-span-8 space-y-6">
-                    <div className="bg-[#12131a] border border-[#1f202b] rounded-2xl p-8 shadow-xl min-h-[500px]">
-                        <div className="flex items-center justify-between mb-8">
+                <div className="lg:col-span-8 flex flex-col min-h-0">
+                    <div className="bg-[#12131a] border border-[#1f202b] rounded-2xl p-8 shadow-xl flex flex-col h-full min-h-0 overflow-hidden">
+                        <div className="flex items-center justify-between mb-8 shrink-0">
                             <h3 className="text-xl font-bold text-white flex items-center gap-3">
                                 <ActivityIcon className="w-6 h-6 text-purple-500" />
                                 My Activity Log
@@ -258,7 +258,7 @@ export default function ProfilePage() {
                         </div>
 
                         {activities.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+                            <div className="flex-1 flex flex-col items-center justify-center py-10 text-center space-y-4">
                                 <div className="w-16 h-16 rounded-full bg-[#1e1f2b] flex items-center justify-center">
                                     <Clock className="w-8 h-8 text-slate-600" />
                                 </div>
@@ -268,31 +268,33 @@ export default function ProfilePage() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:w-0.5 before:-z-10 before:bg-[#1f202b]">
-                                {activities.map((activity) => (
-                                    <div key={activity.$id} className="group relative flex gap-6 items-start pb-4">
-                                        <div className={`mt-1.5 w-10 h-10 rounded-full flex items-center justify-center shrink-0 z-10 border-4 border-[#12131a] ${getActivityColor(activity.action)} shadow-lg transition-transform group-hover:scale-110`}>
-                                            {getActivityIcon(activity.action)}
-                                        </div>
-                                        
-                                        <div className="flex-1 bg-[#1e1f2b]/40 border border-[#2a2b36]/40 p-5 rounded-2xl hover:bg-[#1e1f2b]/80 hover:border-purple-500/20 transition-all group-hover:shadow-lg group-hover:-translate-y-1">
-                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                                                <p className="text-sm text-slate-200 leading-relaxed">
-                                                    <span className="text-white font-bold">You</span> {renderActivityDescription(activity)}
-                                                </p>
-                                                <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap bg-[#2a2b36]/50 px-2 py-1 rounded uppercase tracking-wider">
-                                                    {activity.project_name}
-                                                </span>
+                            <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar scroll-smooth">
+                                <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:w-0.5 before:-z-10 before:bg-[#1f202b]">
+                                    {activities.map((activity) => (
+                                        <div key={activity.$id} className="group relative flex gap-6 items-start pb-4">
+                                            <div className={`mt-1.5 w-10 h-10 rounded-full flex items-center justify-center shrink-0 z-10 border-4 border-[#12131a] ${getActivityColor(activity.action)} shadow-lg transition-transform group-hover:scale-110`}>
+                                                {getActivityIcon(activity.action)}
                                             </div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                                                    <Clock className="w-3 h-3" />
-                                                    {formatFullDate(activity.$createdAt)}
+                                            
+                                            <div className="flex-1 bg-[#1e1f2b]/40 border border-[#2a2b36]/40 p-5 rounded-2xl hover:bg-[#1e1f2b]/80 hover:border-purple-500/20 transition-all group-hover:shadow-lg group-hover:-translate-y-1">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                                                    <div className="text-sm text-slate-200 leading-relaxed">
+                                                        <span className="text-white font-bold">You</span> {renderActivityDescription(activity)}
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap bg-[#2a2b36]/50 px-2 py-1 rounded uppercase tracking-wider">
+                                                        {activity.project_name}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                                        <Clock className="w-3 h-3" />
+                                                        {formatFullDate(activity.$createdAt)}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
