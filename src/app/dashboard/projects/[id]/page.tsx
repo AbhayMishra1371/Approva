@@ -65,6 +65,8 @@ type Asset = {
     status: string;
     url: string;
     file_path: string;
+    asset_group_id?: string;
+    is_latest?: boolean;
 };
 
 export default function ProjectDetailPage() {
@@ -118,6 +120,7 @@ export default function ProjectDetailPage() {
                 process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
                 [
                     Query.equal("project_id", id),
+                    Query.equal("is_latest", true),
                     Query.orderDesc("$createdAt")
                 ]
             );

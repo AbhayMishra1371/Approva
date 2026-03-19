@@ -13,8 +13,12 @@ import {
     SquareSquare,
     User,
     ListFilter,
-    Send
+    Send,
+    ChevronDown,
+    Plus,
+    X
 } from "lucide-react";
+import { AssetUpload } from "@/components/projects/AssetUpload";
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query, ID, Permission, Role } from "appwrite";
 import { toast } from "sonner";
@@ -30,6 +34,9 @@ type Asset = {
     version: string;
     status: string;
     url: string;
+    file_path: string;
+    asset_group_id?: string;
+    is_latest?: boolean;
 };
 
 export type GeneralComment = {
@@ -59,6 +66,10 @@ export default function AssetDetailPage() {
     const [generalComments, setGeneralComments] = useState<GeneralComment[]>([]);
     const [newGeneralComment, setNewGeneralComment] = useState("");
     const [isSubmittingGeneralComment, setIsSubmittingGeneralComment] = useState(false);
+
+    // Versions State
+    const [versions, setVersions] = useState<Asset[]>([]);
+    const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
     // Role state
     const [role, setRole] = useState<'owner' | 'admin' | 'reviewer' | 'viewer' | null>(null);
@@ -133,6 +144,23 @@ export default function AssetDetailPage() {
                     })));
                 } catch (e) {
                     console.warn("General comments collection might not exist yet.", e);
+                }
+
+                // Fetch Versions if they exist
+                if (assetDoc.asset_group_id) {
+                    try {
+                        const versionDocs = await databases.listDocuments(
+                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
+                            [
+                                Query.equal("asset_group_id", assetDoc.asset_group_id),
+                                Query.orderDesc("version")
+                            ]
+                        );
+                        setVersions(versionDocs.documents.map(doc => ({ ...doc as any, id: doc.$id })));
+                    } catch (e) {
+                        console.error("Error fetching versions:", e);
+                    }
                 }
 
             } catch (error) {
@@ -516,6 +544,26 @@ export default function AssetDetailPage() {
         }
     };
 
+    const handleDownload = (filePath: string) => {
+        try {
+            const { storage } = createBrowserClient();
+            const downloadUrl = storage.getFileDownload(
+                process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
+                filePath
+            ).toString();
+
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error("Download error:", error);
+            toast.error("Failed to start download.");
+        }
+    };
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-screen bg-[#0b0c10]">
@@ -547,12 +595,41 @@ export default function AssetDetailPage() {
                         <ArrowLeft className="w-5 h-5" />
                     </Link>
                     <div>
-                        <h1 className="text-white font-bold text-sm leading-none mb-1">{asset.file_name}</h1>
+                        <div className="flex items-center gap-2 mb-1">
+                            <h1 className="text-white font-bold text-sm leading-none">{asset.file_name}</h1>
+                            {versions.length > 1 && (
+                                <div className="relative group/version">
+                                    <button className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-bold text-purple-400 hover:border-purple-500/50 transition-colors">
+                                        {asset.version}
+                                        <ChevronDown className="w-2.5 h-2.5" />
+                                    </button>
+                                    <div className="absolute top-full left-0 mt-1 w-32 bg-[#1a1c26] border border-[#2a2b36] rounded-lg shadow-xl opacity-0 invisible group-hover/version:opacity-100 group-hover/version:visible transition-all z-50 overflow-hidden">
+                                        {versions.map((v) => (
+                                            <button
+                                                key={v.id}
+                                                onClick={() => router.push(`/dashboard/projects/${projectId}/assets/${v.id}`)}
+                                                className={`w-full px-3 py-2 text-left text-[10px] font-medium transition-colors hover:bg-white/5 flex items-center justify-between ${v.id === assetId ? 'text-purple-400 bg-purple-500/5' : 'text-slate-400'}`}
+                                            >
+                                                <span>{v.version}</span>
+                                                {v.is_latest && <span className="text-[8px] bg-purple-500/20 px-1 rounded text-purple-400">LATEST</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {versions.length <= 1 && (
+                                <span className="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 font-bold text-[10px] text-slate-400">{asset.version}</span>
+                            )}
+                        </div>
                         <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                            <span className="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 font-bold">{asset.version}</span>
-                            <span>•</span>
                             <Clock className="w-3 h-3" />
                             <span>{new Date(asset.created_at).toLocaleDateString()}</span>
+                            {asset.is_latest && (
+                                <>
+                                    <span>•</span>
+                                    <span className="text-emerald-400 font-bold uppercase tracking-wider">Latest Version</span>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -575,10 +652,26 @@ export default function AssetDetailPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 lg:gap-3">
-                        <button className="flex items-center gap-2 bg-[#1e1f2b] hover:bg-[#2a2b36] border border-[#2a2b36] text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs">
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownload(asset.file_path);
+                            }}
+                            className="flex items-center gap-2 bg-[#1e1f2b] hover:bg-[#2a2b36] border border-[#2a2b36] text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs"
+                        >
                             <Download className="w-3.5 h-3.5 text-purple-400" />
                             Download
                         </button>
+
+                        {(role === 'owner' || role === 'admin') && (
+                            <button 
+                                onClick={() => setIsUploadModalOpen(true)}
+                                className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                New Version
+                            </button>
+                        )}
 
                         {(role === 'reviewer' || role === 'owner' || role === 'admin') && (!asset.status || asset.status === 'in_review' || asset.status === 'draft' || asset.status.toLowerCase() === 'pending') && (
                             <>
@@ -794,7 +887,7 @@ export default function AssetDetailPage() {
                                                 asset.status === 'rejected' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
                                                     asset.status === 'changes_requested' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                                                         'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
-                                            {asset.status ? asset.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'In Review'}
+                                            {asset.status ? asset.status.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : 'In Review'}
                                         </div>
                                     </div>
                                 </div>
@@ -864,6 +957,36 @@ export default function AssetDetailPage() {
                     </div>
                 </div>
             </main>
+            {/* New Version Upload Modal */}
+            {isUploadModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+                    <div className="bg-[#12131a] border border-[#1f202b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between p-6 border-b border-[#1f202b]">
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-1">Upload New Version</h2>
+                                <p className="text-sm text-slate-400">Replace current asset with a new version.</p>
+                            </div>
+                            <button
+                                onClick={() => setIsUploadModalOpen(false)}
+                                className="p-2 hover:bg-[#1e1f2b] rounded-lg transition-colors text-slate-400 hover:text-white"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <AssetUpload 
+                                projectId={projectId} 
+                                assetGroupId={asset.asset_group_id} 
+                                currentVersion={parseInt(asset.version.replace('v', ''))} 
+                                onUploadSuccess={() => {
+                                    setIsUploadModalOpen(false);
+                                    window.location.reload(); // Simplest way to refresh everything
+                                }} 
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

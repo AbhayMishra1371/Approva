@@ -16,7 +16,7 @@ export async function DELETE(
 
         const { id: projectId } = await params;
         console.log(`[DEBUG] Starting cascade deletion for project: ${projectId}`);
-        
+
         const { databases, storage } = await createAdminClient();
 
         // 1. Check if user is the owner

@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { UploadCloud, File, X, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
-import { ID, Permission, Role } from "appwrite";
+import { ID, Permission, Role, Query } from "appwrite";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/appwrite/client";
 
@@ -11,9 +11,11 @@ interface AssetUploadProps {
     projectId: string;
     onUploadSuccess?: () => void;
     hideWhenIdle?: boolean;
+    assetGroupId?: string;
+    currentVersion?: number;
 }
 
-export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle }: AssetUploadProps) {
+export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle, assetGroupId, currentVersion }: AssetUploadProps) {
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
@@ -69,7 +71,36 @@ export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle }: AssetU
                 storageData.$id
             ).toString();
 
-            // 3. Save metadata to Database directly
+            // 3. Save metadata to Database
+            const isNewVersion = !!assetGroupId;
+            const groupId = assetGroupId || ID.unique();
+            const newVersionNumber = isNewVersion ? (currentVersion || 1) + 1 : 1;
+
+            if (isNewVersion) {
+                // Find and update current latest version to not be latest
+                try {
+                    const latestDocs = await databases.listDocuments(
+                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                        process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
+                        [
+                            Query.equal("asset_group_id", assetGroupId),
+                            Query.equal("is_latest", true)
+                        ]
+                    );
+
+                    for (const doc of latestDocs.documents) {
+                        await databases.updateDocument(
+                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
+                            doc.$id,
+                            { is_latest: false }
+                        );
+                    }
+                } catch (e) {
+                    console.error("Failed to update previous version latest status:", e);
+                }
+            }
+
             const assetDoc = await databases.createDocument(
                 process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                 process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
@@ -81,12 +112,19 @@ export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle }: AssetU
                     file_type: file.type,
                     size: file.size,
                     url: publicUrl,
-                    version: "v1",
-                    status: "Pending"
+                    version: `v${newVersionNumber}`,
+                    status: "Pending",
+                    asset_group_id: groupId,
+                    is_latest: true
                 }
             );
 
             // 4. Create Activity Log
+            const action = isNewVersion ? "uploaded_new_version" : "uploaded_asset";
+            const metadata = isNewVersion
+                ? { file_name: file.name, version: newVersionNumber }
+                : { file_name: file.name };
+
             await databases.createDocument(
                 process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                 process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
@@ -95,10 +133,10 @@ export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle }: AssetU
                     project_id: projectId,
                     user_id: user.$id,
                     user_email: user.email,
-                    action: "uploaded_asset",
+                    action: action,
                     entity_type: "asset",
                     entity_id: assetDoc.$id,
-                    metadata: JSON.stringify({ file_name: file.name })
+                    metadata: JSON.stringify(metadata)
                 },
                 [
                     Permission.read(Role.users()),
