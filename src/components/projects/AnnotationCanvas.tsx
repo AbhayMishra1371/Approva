@@ -81,19 +81,28 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         let actualHeight = rect.height;
 
 
-        const img = container.querySelector('img');
-        if (img) {
-            const imgRatio = img.naturalWidth / img.naturalHeight;
-            const containerRatio = rect.width / rect.height;
-
-            if (imgRatio > containerRatio) {
-
-                actualHeight = rect.width / imgRatio;
-                actualTop = rect.top + (rect.height - actualHeight) / 2;
+        const mediaElement = container.querySelector('img, video') as HTMLImageElement | HTMLVideoElement | null;
+        if (mediaElement) {
+            let naturalWidth, naturalHeight;
+            if (mediaElement instanceof HTMLImageElement) {
+                naturalWidth = mediaElement.naturalWidth;
+                naturalHeight = mediaElement.naturalHeight;
             } else {
+                naturalWidth = (mediaElement as HTMLVideoElement).videoWidth;
+                naturalHeight = (mediaElement as HTMLVideoElement).videoHeight;
+            }
 
-                actualWidth = rect.height * imgRatio;
-                actualLeft = rect.left + (rect.width - actualWidth) / 2;
+            if (naturalWidth && naturalHeight) {
+                const mediaRatio = naturalWidth / naturalHeight;
+                const containerRatio = rect.width / rect.height;
+
+                if (mediaRatio > containerRatio) {
+                    actualHeight = rect.width / mediaRatio;
+                    actualTop = rect.top + (rect.height - actualHeight) / 2;
+                } else {
+                    actualWidth = rect.height * mediaRatio;
+                    actualLeft = rect.left + (rect.width - actualWidth) / 2;
+                }
             }
         }
 
@@ -178,8 +187,8 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
         const distance = Math.sqrt(Math.pow(coords.x - startPos.x, 2) + Math.pow(coords.y - startPos.y, 2));
 
         if (distance < 2) {
-            console.log("DEBUG: distance small enough for click, setting draft pin at:", startPos);
-            setDraftPin(startPos);
+            console.log("DEBUG: distance small enough for click, setting draft pin at:", coords);
+            setDraftPin(coords);
             setDraftName("New Annotation");
         } else {
             console.log("DEBUG: distance too large for click:", distance);
@@ -239,7 +248,7 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
             {/* Inner scaled/panned container */}
             <div
                 ref={innerRef}
-                className="absolute inset-0 w-full h-full origin-center transition-transform duration-75"
+                className="absolute inset-0 w-full h-full origin-center"
                 style={{
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`
                 }}
@@ -247,13 +256,13 @@ export const AnnotationCanvas: React.FC<AnnotationCanvasProps> = ({
                 {assetType.startsWith('video/') ? (
                     <video
                         src={assetUrl}
-                        className="w-full h-full object-contain pointer-events-none"
+                        className="w-full h-full object-contain pointer-events-none block"
                     />
                 ) : (
                     <img
                         src={assetUrl}
                         alt="Asset"
-                        className="w-full h-full object-contain pointer-events-none select-none"
+                        className="w-full h-full object-contain pointer-events-none select-none block"
                         draggable={false}
                     />
                 )}

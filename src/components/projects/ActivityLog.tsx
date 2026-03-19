@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { 
-    Activity, 
-    UserPlus, 
-    MessageSquare, 
-    CheckCircle, 
-    UploadCloud, 
+import {
+    Activity,
+    UserPlus,
+    MessageSquare,
+    CheckCircle,
+    UploadCloud,
     Pin,
     Clock,
     User,
@@ -48,7 +48,7 @@ export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
                 const { jwt } = await account.createJWT();
 
                 // If no projectId, we fetch from the global activity API
-                const url = projectId 
+                const url = projectId
                     ? `/api/projects/${projectId}/activity${assetId ? `?assetId=${assetId}` : ''}`
                     : '/api/activity';
 
@@ -178,8 +178,8 @@ export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
                 </div>
                 <h3 className="text-white font-bold mb-1">No activity yet</h3>
                 <p className="text-sm text-slate-400 max-w-xs">
-                    {assetId 
-                        ? "Actions related to this asset will appear here." 
+                    {assetId
+                        ? "Actions related to this asset will appear here."
                         : "Actions taken in this project will appear here in chronological order."}
                 </p>
             </div>
@@ -189,10 +189,10 @@ export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
     return (
         <div className="flex flex-col gap-3 p-6 max-w-4xl mx-auto w-full">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-purple-400" /> 
+                <Activity className="w-5 h-5 text-purple-400" />
                 {assetId ? "Asset Activity" : projectId ? "Project Activity" : "Global Activity Stream"}
             </h2>
-            
+
             <div className="relative space-y-4">
                 {/* Timeline Line */}
                 <div className="absolute left-[19px] top-2 bottom-2 w-px bg-slate-800 hidden sm:block" />
@@ -200,7 +200,7 @@ export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
                 {logs.map((log) => {
                     const details = getActionDetails(log);
                     const userName = log.user_email ? log.user_email.split('@')[0] : (log.user_id || "Someone");
-                    
+
                     return (
                         <div key={log.$id} className="relative flex items-start gap-4 group">
                             {/* Icon Circle */}
