@@ -36,37 +36,33 @@ export async function DELETE(
 
         const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
 
-        // Helper to delete all documents in a collection matching project_id
-        const deleteCascade = async (collectionId: string | undefined, label: string) => {
-            if (!collectionId) {
-                console.log(`[CASCADE] Skipping ${label} - Collection ID not defined`);
-                return;
-            }
+        // Fallback-friendly Collection IDs
+        const COLLECTIONS = {
+            comments: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COMMENTS_ID || "comments",
+            general_comments: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_GENERAL_COMMENTS_ID || "general_comments",
+            annotations: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ANNOTATIONS_ID || "annotations",
+            invites: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID || "invites",
+            collaborators: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID || "collaborators",
+            assets: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID || "assets",
+            folders: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_FOLDERS_ID || "folders",
+            activity: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
+            asset_versions: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSET_VERSIONS_ID || "asset_versions",
+            workflows: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_WORKFLOWS_ID || "workflows",
+            approvals: process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_APPROVALS_ID || "approvals",
+        };
 
+        // Helper to delete all documents in a collection matching a query
+        const deleteByQuery = async (collectionId: string, queries: any[], label: string) => {
             try {
                 let hasMore = true;
                 let deletedCount = 0;
-
                 while (hasMore) {
-                    const response = await databases.listDocuments(
-                        databaseId,
-                        collectionId,
-                        [
-                            Query.equal("project_id", projectId),
-                            Query.limit(100)
-                        ]
-                    );
-
-                    console.log(`[CASCADE] Found ${response.documents.length} documents in ${label}`);
-
+                    const response = await databases.listDocuments(databaseId, collectionId, [...queries, Query.limit(100)]);
                     if (response.documents.length === 0) {
                         hasMore = false;
                         break;
                     }
-
                     for (const doc of response.documents) {
-                        // For assets, we might need special handling if we want to delete storage files too
-                        // But we'll handle that separately for assets
                         try {
                             await databases.deleteDocument(databaseId, collectionId, doc.$id);
                             deletedCount++;
@@ -74,100 +70,92 @@ export async function DELETE(
                             console.error(`[CASCADE] Failed to delete ${label} document ${doc.$id}:`, err);
                         }
                     }
-
-                    // If we got fewer than 100, we're likely done, but pagination loop ensures it
-                    if (response.documents.length < 100) {
-                        hasMore = false;
-                    }
+                    if (response.documents.length < 100) hasMore = false;
                 }
-                console.log(`[CASCADE] Deleted ${deletedCount} documents from ${label} (${collectionId})`);
-            } catch (error) {
-                console.error(`[CASCADE] Error deleting from ${label}:`, error);
+                if (deletedCount > 0) {
+                    console.log(`[CASCADE] Deleted ${deletedCount} documents from ${label} (${collectionId})`);
+                }
+            } catch (err) {
+                console.warn(`[CASCADE] Error in ${label} deletion:`, err);
             }
         };
 
-        // Order of deletion:
-        // 1. comments
-        await deleteCascade(process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COMMENTS_ID, "comments");
-        await deleteCascade(process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_GENERAL_COMMENTS_ID, "general_comments");
+        // 1. Fetch all assets to handle their specific dependencies (annotations, files)
+        // We fetch in batches to avoid hitting Appwrite's 2000 document limit for listDocuments
+        let allAssets: any[] = [];
+        let offset = 0;
+        const limit = 100;
+        let hasMoreAssetsToFetch = true;
 
-        // 2. annotations
-        await deleteCascade(process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ANNOTATIONS_ID, "annotations");
+        while (hasMoreAssetsToFetch) {
+            const assetResponse = await databases.listDocuments(
+                databaseId,
+                COLLECTIONS.assets,
+                [Query.equal("project_id", projectId), Query.limit(limit), Query.offset(offset)]
+            );
+            allAssets = allAssets.concat(assetResponse.documents);
+            if (assetResponse.documents.length < limit) {
+                hasMoreAssetsToFetch = false;
+            } else {
+                offset += limit;
+            }
+        }
+        console.log(`[CASCADE] Found ${allAssets.length} assets for project ${projectId}`);
 
-        // 3. project_invites
-        await deleteCascade(process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID, "invites");
+        for (const asset of allAssets) {
+            // Delete asset_versions linked to this asset
+            await deleteByQuery(COLLECTIONS.asset_versions, [Query.equal("asset_id", asset.$id)], `asset_versions for asset ${asset.$id}`);
 
-        // 4. project_collaborators (all except the owner record? or all including owner then project itself?)
-        // Rules say delete all related docs, then project doc.
-        await deleteCascade(process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID, "collaborators");
+            // Delete annotations linked to this asset
+            await deleteByQuery(COLLECTIONS.annotations, [Query.equal("asset_id", asset.$id)], `annotations for asset ${asset.$id}`);
+            
+            // Delete general comments linked to this asset
+            await deleteByQuery(COLLECTIONS.general_comments, [Query.equal("asset_id", asset.$id)], `gen_comments for asset ${asset.$id}`);
 
-        // 5. asset_versions
-        await deleteCascade(process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSET_VERSIONS_ID, "asset_versions");
+            // Delete comments linked to this asset
+            await deleteByQuery(COLLECTIONS.comments, [Query.equal("asset_id", asset.$id)], `comments for asset ${asset.$id}`);
 
-        // 6. assets (with storage files)
-        const assetsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID;
-        if (assetsCollectionId) {
-            try {
-                let hasMoreAssets = true;
-                while (hasMoreAssets) {
-                    const assetRes = await databases.listDocuments(
-                        databaseId,
-                        assetsCollectionId,
-                        [Query.equal("project_id", projectId), Query.limit(100)]
+            // Delete storage file
+            if (asset.file_path) {
+                try {
+                    await storage.deleteFile(
+                        process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
+                        asset.file_path
                     );
-
-                    if (assetRes.documents.length === 0) {
-                        hasMoreAssets = false;
-                        break;
-                    }
-
-                    for (const asset of assetRes.documents) {
-                        // Delete file from storage
-                        if (asset.file_path) {
-                            try {
-                                await storage.deleteFile(
-                                    process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
-                                    asset.file_path
-                                );
-                            } catch (err) {
-                                console.warn(`[CASCADE] Failed to delete storage file ${asset.file_path}:`, err);
-                            }
-                        }
-                        // Delete asset document
-                        try {
-                            await databases.deleteDocument(databaseId, assetsCollectionId, asset.$id);
-                        } catch (err) {
-                            console.error(`[CASCADE] Failed to delete asset document ${asset.$id}:`, err);
-                        }
-                    }
-
-                    if (assetRes.documents.length < 100) hasMoreAssets = false;
+                    console.log(`[CASCADE] Deleted storage file ${asset.file_path}`);
+                } catch (err) {
+                    console.warn(`[CASCADE] Storage file delete failed for ${asset.file_path}:`, err);
                 }
+            }
+            
+            // Delete the asset document
+            try {
+                await databases.deleteDocument(databaseId, COLLECTIONS.assets, asset.$id);
+                console.log(`[CASCADE] Deleted asset document ${asset.$id}`);
             } catch (err) {
-                console.error("[CASCADE] Error during assets/storage deletion:", err);
+                console.error(`[CASCADE] Failed to delete asset doc ${asset.$id}:`, err);
             }
         }
 
-        // 7. folders
-        await deleteCascade(process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_FOLDERS_ID, "folders");
+        // 2. Global project-linked items (using project_id)
+        await deleteByQuery(COLLECTIONS.invites, [Query.equal("project_id", projectId)], "invites");
+        await deleteByQuery(COLLECTIONS.collaborators, [Query.equal("project_id", projectId)], "collaborators");
+        await deleteByQuery(COLLECTIONS.activity, [Query.equal("project_id", projectId)], "activity_logs");
+        await deleteByQuery(COLLECTIONS.folders, [Query.equal("project_id", projectId)], "folders");
+        await deleteByQuery(COLLECTIONS.workflows, [Query.equal("project_id", projectId)], "workflows");
+        await deleteByQuery(COLLECTIONS.approvals, [Query.equal("project_id", projectId)], "approvals");
 
-        // 8. activity_logs
-        await deleteCascade(process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID, "activity_logs");
 
-        // 9. workflows
-        await deleteCascade(process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_WORKFLOWS_ID, "workflows");
-
-        // 10. approvals
-        await deleteCascade(process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_APPROVALS_ID, "approvals");
-
-        // 11. The project document itself
+        // 3. The project document itself
         await databases.deleteDocument(
             databaseId,
             process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
             projectId
         );
+        console.log(`[CASCADE] Deleted project document ${projectId}`);
 
-        return NextResponse.json({ message: "Project and all related documents deleted successfully" }, { status: 200 });
+
+        return NextResponse.json({ message: "Project and all related data deleted successfully" }, { status: 200 });
 
     } catch (error: any) {
         console.error("Cascade Project Deletion Error:", error);
