@@ -378,10 +378,10 @@ export default function ProjectDetailPage() {
                     label="Activity Log"
                 />
                 <TabButton
-                    active={activeTab === "analytics"}
-                    onClick={() => setActiveTab("analytics")}
-                    icon={<BarChart className="w-4 h-4" />}
-                    label="Analytics"
+                    active={activeTab === "approved"}
+                    onClick={() => setActiveTab("approved")}
+                    icon={<CheckCircle className="w-4 h-4" />}
+                    label="Approved Assets"
                 />
                 <TabButton
                     active={activeTab === "settings"}
@@ -424,9 +424,9 @@ export default function ProjectDetailPage() {
                                 <div className="flex-1 flex items-center justify-center border-2 border-dashed border-[#1f202b] rounded-xl bg-[#151720]">
                                     <div className="text-center text-slate-500 animate-pulse">Loading assets...</div>
                                 </div>
-                            ) : assets.length > 0 ? (
+                            ) : assets.filter(a => a.status !== 'approved').length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                    {assets.map((asset) => (
+                                    {assets.filter(a => a.status !== 'approved').map((asset) => (
                                         <div key={asset.id} className="bg-[#1a1c26] border border-[#2a2b36] rounded-xl overflow-hidden hover:border-purple-500/50 transition-colors group">
                                             <div className="h-32 bg-[#12131a] flex items-center justify-center border-b border-[#2a2b36] relative">
                                                 {getFileIcon(asset.file_type)}
@@ -533,8 +533,80 @@ export default function ProjectDetailPage() {
                     </div>
                 )}
 
+                {activeTab === "approved" && (
+                    <div className="flex-1 p-4 md:p-6 flex flex-col min-w-0 overflow-y-auto">
+                        <div className="flex items-center justify-between gap-2 sm:gap-4 mb-6">
+                            <h2 className="text-lg font-bold text-white shrink-0">Approved Assets</h2>
+                        </div>
+
+                        {assets.filter(a => a.status === 'approved').length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                {assets.filter(a => a.status === 'approved').map((asset) => (
+                                    <div key={asset.id} className="bg-[#1a1c26] border border-[#2a2b36] rounded-xl overflow-hidden hover:border-purple-500/50 transition-colors group">
+                                        <div className="h-32 bg-[#12131a] flex items-center justify-center border-b border-[#2a2b36] relative">
+                                            {getFileIcon(asset.file_type)}
+
+                                            {/* Hover Actions */}
+                                            <div className="absolute inset-0 bg-[#12131a]/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                                                <Link
+                                                    href={`/dashboard/projects/${id}/assets/${asset.id}`}
+                                                    className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center text-white hover:bg-purple-600 transition-colors shadow-lg"
+                                                    title="View & Annotate"
+                                                >
+                                                    <Maximize2 className="w-5 h-5" />
+                                                </Link>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDownload(asset.file_path);
+                                                    }}
+                                                    className="w-10 h-10 rounded-full bg-slate-500/10 flex items-center justify-center text-slate-400 border border-slate-500/20 hover:bg-slate-500 hover:text-white transition-colors shadow-lg"
+                                                    title="Download Asset"
+                                                >
+                                                    <Download className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="p-4">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <h3 className="text-white font-medium text-sm truncate pr-4" title={asset.file_name}>
+                                                    {asset.file_name}
+                                                </h3>
+                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-400 border border-slate-700">
+                                                    {asset.version}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                                                <div className="inline-flex items-center text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                                    APPROVED
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs text-slate-500">
+                                                <span>{formatBytes(asset.size)}</span>
+                                                <span>{new Date(asset.created_at).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-[#1f202b] rounded-xl bg-[#151720]">
+                                <div className="text-center">
+                                    <div className="w-16 h-16 bg-[#1e1f2b] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <CheckCircle className="w-8 h-8 text-slate-500" />
+                                    </div>
+                                    <h3 className="text-white font-bold mb-1">No approved assets</h3>
+                                    <p className="text-sm text-slate-400 mb-4 max-w-sm">
+                                        Assets marked as approved will appear here.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Other tabs placeholders */}
-                {activeTab !== "assets" && activeTab !== "collaborators" && activeTab !== "activity" && (
+                {activeTab !== "assets" && activeTab !== "collaborators" && activeTab !== "activity" && activeTab !== "approved" && (
                     <div className="flex-1 flex items-center justify-center p-12">
                         <div className="text-center">
                             <h3 className="text-xl font-bold text-white mb-2 capitalize">{activeTab}</h3>
