@@ -13,6 +13,7 @@ import {
     FileText,
     UserPlus,
 } from "lucide-react";
+import CountUp from "@/components/CountUp";
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query } from "appwrite";
 import { toast } from "sonner";
@@ -28,6 +29,60 @@ import {
     BarChart,
     Bar,
 } from "recharts";
+
+// StatCard Component
+function StatCard({
+    title,
+    value,
+    trend,
+    trendUp,
+    icon,
+}: {
+    title: string;
+    value: string;
+    trend: string;
+    trendUp: boolean;
+    icon: React.ReactNode;
+}) {
+    const isRejectionRate = title === "Rejection Rate";
+    const numericValue = parseFloat(value.replace('%', ''));
+
+    return (
+        <div className="bg-[#12131a] border border-[#1f202b] rounded-xl p-6 flex flex-col justify-between group hover:border-purple-500/30 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-slate-400 font-medium text-sm">{title}</h3>
+                <div className="w-10 h-10 rounded-lg bg-[#1e1f2b] flex items-center justify-center group-hover:bg-purple-500/10 transition-colors duration-300">
+                    {icon}
+                </div>
+            </div>
+            <div>
+                <div className="text-3xl font-bold text-white mb-2 flex items-baseline gap-0.5">
+                    <CountUp
+                        to={numericValue}
+                        duration={1.5}
+                        className="text-white"
+                        onStart={() => {}}
+                        onEnd={() => {}}
+                    />
+                    {isRejectionRate && <span className="text-lg opacity-80">%</span>}
+                </div>
+                <div className="flex items-center gap-1.5 text-sm">
+                    {trendUp ? (
+                        <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                        <TrendingDown className="w-4 h-4 text-rose-400" />
+                    )}
+                    <span
+                        className={trendUp ? "text-emerald-400 font-medium" : "text-rose-400 font-medium"}
+                    >
+                        {trend}
+                    </span>
+                    <span className="text-slate-500 text-[10px] uppercase tracking-wider font-semibold">vs last week</span>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export default function DashboardPage() {
     const [invites, setInvites] = useState<any[]>([]);
@@ -366,47 +421,6 @@ export default function DashboardPage() {
                             </div>
                         </div>
                     ))}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function StatCard({
-    title,
-    value,
-    trend,
-    trendUp,
-    icon,
-}: {
-    title: string;
-    value: string;
-    trend: string;
-    trendUp: boolean;
-    icon: React.ReactNode;
-}) {
-    return (
-        <div className="bg-[#12131a] border border-[#1f202b] rounded-xl p-6 flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-slate-400 font-medium text-sm">{title}</h3>
-                <div className="w-10 h-10 rounded-lg bg-[#1e1f2b] flex items-center justify-center">
-                    {icon}
-                </div>
-            </div>
-            <div>
-                <div className="text-3xl font-bold text-white mb-2">{value}</div>
-                <div className="flex items-center gap-1.5 text-sm">
-                    {trendUp ? (
-                        <TrendingUp className="w-4 h-4 text-emerald-400" />
-                    ) : (
-                        <TrendingDown className="w-4 h-4 text-rose-400" />
-                    )}
-                    <span
-                        className={trendUp ? "text-emerald-400 font-medium" : "text-rose-400 font-medium"}
-                    >
-                        {trend}
-                    </span>
-                    <span className="text-slate-500">vs last week</span>
                 </div>
             </div>
         </div>

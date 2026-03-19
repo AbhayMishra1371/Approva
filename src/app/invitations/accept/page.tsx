@@ -48,8 +48,8 @@ function InvitationAcceptHandler() {
                         const errorData = await res.json();
 
                         if (res.status === 403) {
-                            setMismatchData({ 
-                                token, 
+                            setMismatchData({
+                                token,
                                 expectedEmail: errorData.expectedEmail,
                                 currentUserEmail: errorData.currentUserEmail || user.email
                             });
@@ -90,14 +90,14 @@ function InvitationAcceptHandler() {
         } catch (e) {
             console.error("Logout error:", e);
         }
-        
+
         const token = mismatchData.token;
         const email = mismatchData.expectedEmail;
-        
-        const targetUrl = email 
+
+        const targetUrl = email
             ? `/login?token=${token}&email=${encodeURIComponent(email)}`
             : `/login?token=${token}`;
-            
+
         // Hard refresh to ensure all states are cleared
         window.location.href = targetUrl;
     };
