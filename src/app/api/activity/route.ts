@@ -22,6 +22,9 @@ export async function GET(request: Request) {
         }
 
         // 1. Fetch projects the user is a collaborator on
+        const url = new URL(request.url);
+        const filterUserId = url.searchParams.get("userId");
+
         const collabsRes = await databases.listDocuments(
             dbId,
             collabsCollId,
@@ -45,15 +48,21 @@ export async function GET(request: Request) {
             return acc;
         }, {});
 
-        // 3. Fetch activity logs for these projects
+        // 3. Fetch activity logs for these projects (with optional user filter)
+        const queries = [
+            Query.equal("project_id", projectIds),
+            Query.orderDesc("$createdAt"),
+            Query.limit(100)
+        ];
+
+        if (filterUserId) {
+            queries.push(Query.equal("user_id", filterUserId));
+        }
+
         const logsRes = await databases.listDocuments(
             dbId,
             activityLogsCollId,
-            [
-                Query.equal("project_id", projectIds),
-                Query.orderDesc("$createdAt"),
-                Query.limit(100)
-            ]
+            queries
         );
 
         // 4. Attach project names to logs

@@ -156,7 +156,7 @@ export default function DashboardLayout({
                         </div>
                     </div>
                     {[
-                        { name: "Settings", href: "/dashboard/settings", icon: Settings },
+                        { name: "Settings", href: "/dashboard/profile", icon: Settings },
                         { name: "Help & Support", href: "/dashboard/support", icon: HelpCircle },
                     ].map((link) => {
                         const isActive = pathname === link.href || (link.href !== "/dashboard" && pathname?.startsWith(link.href));
@@ -215,7 +215,7 @@ export default function DashboardLayout({
                                 </div>
                             </div>
                             <Link
-                                href="/dashboard/settings"
+                                href="/dashboard/profile"
                                 className="flex items-center gap-2 px-3 py-2 text-sm text-slate-300 hover:bg-[#2a2b36] hover:text-white transition-colors"
                                 onClick={() => setIsDropdownOpen(false)}
                             >

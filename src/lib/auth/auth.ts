@@ -49,6 +49,29 @@ export const getJwt = async () => {
     }
 };
 
+export const updateName = async (name: string) => {
+    const { account } = createBrowserClient();
+    try {
+        await account.updateName(name);
+        return { success: true, error: null };
+    } catch (error: any) {
+        console.error("UpdateName Error:", error?.message || error);
+        return { success: false, error };
+    }
+};
+
+export const updatePrefs = async (prefs: any) => {
+    const { account } = createBrowserClient();
+    try {
+        const user = await account.get();
+        await account.updatePrefs({ ...user.prefs, ...prefs });
+        return { success: true, error: null };
+    } catch (error: any) {
+        console.error("UpdatePrefs Error:", error?.message || error);
+        return { success: false, error };
+    }
+};
+
 export const logout = async () => {
     const { account } = createBrowserClient();
     try {
