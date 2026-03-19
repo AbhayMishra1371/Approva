@@ -10,7 +10,8 @@ import {
     Pin,
     Clock,
     User,
-    FolderOpen
+    FolderOpen,
+    IdCard
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/appwrite/client";
 
@@ -106,6 +107,12 @@ export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
         const m = metadata;
 
         switch (log.action) {
+            case "created_project":
+                return {
+                    icon: <IdCard className="w-4 h-4 text-pink-400" />,
+                    text: `created the project: ${m.project_name || "a new project"}`,
+                    color: "bg-pink-500/10 border-pink-500/20"
+                };
             case "invited_user":
                 return {
                     icon: <UserPlus className="w-4 h-4 text-blue-400" />,
@@ -131,10 +138,17 @@ export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
                     color: "bg-emerald-500/10 border-emerald-500/20"
                 };
             case "uploaded_asset":
+            case "upload":
                 return {
                     icon: <UploadCloud className="w-4 h-4 text-amber-400" />,
                     text: `uploaded a new asset: ${m.file_name || ""}`,
                     color: "bg-amber-500/10 border-amber-500/20"
+                };
+            case "uploaded_new_version":
+                return {
+                    icon: <UploadCloud className="w-4 h-4 text-blue-400" />,
+                    text: `uploaded a new version of ${m.file_name || ""}${m.version ? ` (v${m.version})` : ""}`,
+                    color: "bg-blue-500/10 border-blue-500/20"
                 };
             default:
                 return {

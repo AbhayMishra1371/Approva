@@ -14,7 +14,7 @@ import {
     Loader2
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/appwrite/client";
-import { Query, ID } from "appwrite";
+import { Query, ID, Permission, Role } from "appwrite";
 import { toast } from "sonner";
 import {
     AlertDialog,
@@ -294,6 +294,31 @@ function CreateProjectModal({
                 );
             } catch (collabError) {
                 console.error("Failed to insert owner as collaborator (check permissions):", collabError);
+            }
+
+            // 4. Create Activity Log
+            try {
+                await databases.createDocument(
+                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
+                    ID.unique(),
+                    {
+                        project_id: project.$id,
+                        user_id: user.$id,
+                        user_email: user.email,
+                        action: "created_project",
+                        entity_type: "project",
+                        entity_id: project.$id,
+                        metadata: JSON.stringify({ project_name: data.name })
+                    },
+                    [
+                        Permission.read(Role.users()),
+                        Permission.update(Role.user(user.$id)),
+                        Permission.delete(Role.user(user.$id))
+                    ]
+                );
+            } catch (logError) {
+                console.error("Failed to log project creation activity:", logError);
             }
 
             onSuccess({ ...project, id: project.$id } as any);

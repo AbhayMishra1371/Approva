@@ -13,7 +13,8 @@ import {
     Upload,
     MessageSquare,
     CheckCircle2,
-    Clock
+    Clock,
+    UserPlus
 } from "lucide-react";
 import { getUser, updateName, getJwt } from "@/lib/auth/auth";
 import { toast } from "sonner";
@@ -87,6 +88,45 @@ export default function ProfilePage() {
             hour: '2-digit',
             minute: '2-digit'
         });
+    };
+
+    const renderActivityDescription = (activity: any) => {
+        let metadata: any = {};
+        try {
+            metadata = typeof activity.metadata === 'string' ? JSON.parse(activity.metadata) : (activity.metadata || {});
+        } catch (e) {
+            console.warn("Failed to parse metadata", activity.metadata);
+        }
+
+        const fileName = metadata.file_name ? <span className="text-purple-400 font-bold">{metadata.file_name}</span> : "an asset";
+        const projectName = metadata.project_name ? <span className="text-purple-400 font-bold">{metadata.project_name}</span> : "a project";
+        const email = metadata.invited_email ? <span className="text-purple-400 font-bold">{metadata.invited_email}</span> : "a collaborator";
+        const version = metadata.version ? ` (v${metadata.version})` : "";
+
+        switch (activity.action) {
+            case "uploaded_asset":
+                return <span>uploaded {fileName}</span>;
+            case "uploaded_new_version":
+                return <span>uploaded a new version of {fileName}{version}</span>;
+            case "added_annotation":
+                return <span>added an annotation on {fileName}</span>;
+            case "added_comment":
+                return <span>commented on {fileName}</span>;
+            case "approved_asset":
+                return <span>approved {fileName}</span>;
+            case "invited_user":
+                return <span>invited {email} to the project</span>;
+            case "created_project":
+                return <span>created project {projectName}</span>;
+            case "upload": // Fallback for old logs
+                return <span>uploaded {fileName}</span>;
+            case "comment": // Fallback for old logs
+                return <span>commented on {fileName}</span>;
+            case "approval": // Fallback for old logs
+                return <span>approved {fileName}</span>;
+            default:
+                return <span>{activity.description || activity.action.replace('_', ' ')}</span>;
+        }
     };
 
     if (isLoading) {
@@ -238,7 +278,7 @@ export default function ProfilePage() {
                                         <div className="flex-1 bg-[#1e1f2b]/40 border border-[#2a2b36]/40 p-5 rounded-2xl hover:bg-[#1e1f2b]/80 hover:border-purple-500/20 transition-all group-hover:shadow-lg group-hover:-translate-y-1">
                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                                                 <p className="text-sm text-slate-200 leading-relaxed">
-                                                    <span className="text-white font-bold">You</span> {activity.description}
+                                                    <span className="text-white font-bold">You</span> {renderActivityDescription(activity)}
                                                 </p>
                                                 <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap bg-[#2a2b36]/50 px-2 py-1 rounded uppercase tracking-wider">
                                                     {activity.project_name}
@@ -272,19 +312,21 @@ function ActivityIcon({ className }: { className?: string }) {
 }
 
 function getActivityIcon(action: string) {
-    switch (action) {
-        case "upload": return <Upload className="w-4 h-4" />;
-        case "comment": return <MessageSquare className="w-4 h-4" />;
-        case "approval": return <CheckCircle2 className="w-4 h-4" />;
-        default: return <Clock className="w-4 h-4" />;
-    }
+    if (action.includes('upload')) return <Upload className="w-4 h-4" />;
+    if (action.includes('comment')) return <MessageSquare className="w-4 h-4" />;
+    if (action.includes('annotation')) return <Edit2 className="w-4 h-4" />;
+    if (action.includes('approve')) return <CheckCircle2 className="w-4 h-4" />;
+    if (action.includes('invite')) return <UserPlus className="w-4 h-4" />;
+    if (action.includes('project')) return <IdCard className="w-4 h-4" />;
+    return <Clock className="w-4 h-4" />;
 }
 
 function getActivityColor(action: string) {
-    switch (action) {
-        case "upload": return "bg-blue-500/20 text-blue-400";
-        case "comment": return "bg-purple-500/20 text-purple-400";
-        case "approval": return "bg-emerald-500/20 text-emerald-400";
-        default: return "bg-slate-500/20 text-slate-400";
-    }
+    if (action.includes('upload')) return "bg-blue-500/20 text-blue-400";
+    if (action.includes('comment')) return "bg-purple-500/20 text-purple-400";
+    if (action.includes('annotation')) return "bg-indigo-500/20 text-indigo-400";
+    if (action.includes('approve')) return "bg-emerald-500/20 text-emerald-400";
+    if (action.includes('invite')) return "bg-amber-500/20 text-amber-400";
+    if (action.includes('project')) return "bg-pink-500/20 text-pink-400";
+    return "bg-slate-500/20 text-slate-400";
 }
