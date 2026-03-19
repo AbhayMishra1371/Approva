@@ -7,7 +7,6 @@ import { getUser, logout, getJwt } from "@/lib/auth/auth";
 import {
     LayoutDashboard,
     FolderOpen,
-    CheckCircle,
     Activity,
     Settings,
     HelpCircle,
@@ -138,7 +137,6 @@ export default function DashboardLayout({
                         { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
                         { name: "Projects", href: "/dashboard/projects", icon: FolderOpen },
                         { name: "Assets", href: "/dashboard/assets", icon: FolderOpen },
-                        { name: "Approvals", href: "/dashboard/approvals", icon: CheckCircle },
                         { name: "Activity", href: "/dashboard/activity", icon: Activity },
                     ].map((link) => {
                         const isActive = pathname === link.href || (link.href !== "/dashboard" && pathname?.startsWith(link.href));
