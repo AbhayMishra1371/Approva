@@ -146,7 +146,7 @@ export default function ProfilePage() {
     const userInitial = user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase();
 
     return (
-        <div className="h-[calc(100vh-160px)] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="h-full flex flex-col overflow-hidden pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <header className="mb-6 shrink-0">
                 <h1 className="text-3xl font-bold text-white mb-1 tracking-tight">Your Profile</h1>
                 <p className="text-slate-400 text-sm">Manage your account settings and view your recent activity.</p>
@@ -156,7 +156,7 @@ export default function ProfilePage() {
                 {/* Left Column: Basic & Account Info */}
                 <div className="lg:col-span-4 space-y-6 overflow-y-auto custom-scrollbar pr-2 lg:overflow-visible">
                     {/* Profile Summary Card */}
-                    <div className="bg-[#12131a] border border-[#1f202b] rounded-2xl p-8 flex flex-col items-center text-center shadow-xl relative overflow-hidden group">
+                    <div className="bg-[#12131a] border border-[#1f202b] rounded-2xl p-8 flex flex-col items-center text-center shadow-xl relative overflow-hidden group mb-4">
                         {/* Decorative Background */}
                         <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-br from-purple-500/10 to-transparent -z-10"></div>
 
@@ -244,9 +244,8 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                {/* Right Column: Activity Feed */}
-                <div className="lg:col-span-8 flex flex-col min-h-0">
-                    <div className="bg-[#12131a] border border-[#1f202b] rounded-2xl p-8 shadow-xl flex flex-col h-full min-h-0 overflow-hidden">
+                <div className="lg:col-span-8 flex flex-col min-h-0 pb-4">
+                    <div className="bg-[#12131a] border border-[#1f202b] rounded-2xl p-8 shadow-xl flex flex-col h-full min-h-0 overflow-hidden mb-4">
                         <div className="flex items-center justify-between mb-8 shrink-0">
                             <h3 className="text-xl font-bold text-white flex items-center gap-3">
                                 <ActivityIcon className="w-6 h-6 text-purple-500" />
