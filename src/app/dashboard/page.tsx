@@ -16,6 +16,7 @@ import {
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query } from "appwrite";
 import { toast } from "sonner";
+import { getUser, logout, getJwt } from "@/lib/auth/auth";
 import {
     AreaChart,
     Area,
@@ -49,11 +50,13 @@ export default function DashboardPage() {
             setIsLoading(true);
             try {
                 const { account } = createBrowserClient();
-                const user = await account.get();
+                const user = await account.get().catch(() => null);
                 if (!user?.email) return;
 
-                // Single consolidated fetch for stats and invites
-                const { jwt } = await account.createJWT();
+                // Use hardened getJwt helper
+                const jwt = await getJwt();
+                if (!jwt) return;
+
                 const statsRes = await fetch(`/api/dashboard/stats?t=${Date.now()}`, {
                     headers: { "Authorization": `Bearer ${jwt}` },
                     cache: 'no-store'
@@ -80,8 +83,11 @@ export default function DashboardPage() {
     const handleAcceptInvite = async (inviteId: string) => {
         setIsAccepting(inviteId);
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
+            if (!jwt) {
+                toast.error("Authentication required");
+                return;
+            }
             const res = await fetch("/api/invites/accept", {
                 method: "POST",
                 headers: {

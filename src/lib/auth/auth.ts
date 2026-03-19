@@ -38,6 +38,9 @@ export const getUser = async () => {
 export const getJwt = async () => {
     const { account } = createBrowserClient();
     try {
+        const user = await account.get().catch(() => null);
+        if (!user) return null;
+        
         const jwt = await account.createJWT();
         return jwt.jwt;
     } catch (error: any) {

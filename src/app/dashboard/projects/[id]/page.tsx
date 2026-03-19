@@ -26,6 +26,7 @@ import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query, Permission, Role, ID } from "appwrite";
 import { ActivityLog } from "@/components/projects/ActivityLog";
 import { toast } from "sonner";
+import { getJwt } from "@/lib/auth/auth";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -90,8 +91,10 @@ export default function ProjectDetailPage() {
     useEffect(() => {
         const fetchRole = async () => {
             try {
-                const { account } = createBrowserClient();
-                const { jwt } = await account.createJWT();
+                // Use hardened getJwt helper
+                const jwt = await getJwt();
+                if (!jwt) return;
+
                 const res = await fetch(`/api/projects/collaborators?projectId=${id}`, {
                     headers: { "Authorization": `Bearer ${jwt}` }
                 });
