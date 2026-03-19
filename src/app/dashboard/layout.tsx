@@ -109,21 +109,16 @@ export default function DashboardLayout({
             <aside className={`fixed inset-y-0 right-0 md:left-0 md:right-auto z-50 w-64 bg-[#12131a] flex flex-col border-l md:border-l-0 md:border-r border-[#1f202b] transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? "translate-x-0" : "translate-x-full"}`}>
                 {/* Logo Area */}
                 <div className="p-6 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            className="w-5 h-5 text-white"
-                            strokeWidth="2"
-                        >
-                            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                            <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
-                        </svg>
+                    <div className="w-9 h-9 rounded-xl bg-purple-600/10 flex items-center justify-center overflow-hidden border border-purple-500/20">
+                        <img 
+                            src="/approva-logo.svg" 
+                            alt="Approva Logo" 
+                            className="w-6 h-6 object-contain"
+                        />
                     </div>
                     <div>
                         <h1 className="font-bold text-lg text-white leading-tight">
-                            ApproveFlow
+                            Hello {userName}
                         </h1>
                         <p className="text-xs text-slate-400">Asset Approval</p>
                     </div>
@@ -244,13 +239,10 @@ export default function DashboardLayout({
                 {/* Mobile Header */}
                 <header className="md:hidden flex items-center justify-between p-4 border-b border-[#1f202b] bg-[#12131a] shrink-0">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="w-5 h-5 text-white" strokeWidth="2">
-                                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                                <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
-                            </svg>
+                        <div className="w-8 h-8 rounded-lg bg-purple-600/10 flex items-center justify-center overflow-hidden">
+                            <img src="/approva-logo.svg" alt="Approva Logo" className="w-5 h-5 object-contain" />
                         </div>
-                        <h1 className="font-bold text-lg text-white leading-tight">ApproveFlow</h1>
+                        <h1 className="font-bold text-lg text-white leading-tight truncate max-w-[150px]">Hello {userName}</h1>
                     </div>
                     <button
                         onClick={() => setIsMobileMenuOpen(true)}
