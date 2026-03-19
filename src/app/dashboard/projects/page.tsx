@@ -37,6 +37,8 @@ interface Project {
     owner_id: string;
     created_at: string;
     role?: string;
+    collaboratorCount?: number;
+    pendingCount?: number;
 };
 
 export default function ProjectsPage() {
@@ -157,9 +159,8 @@ export default function ProjectsPage() {
 }
 
 function ProjectCard({ project, onDelete }: { project: Project; onDelete?: (id: string) => void }) {
-    // Mock data for counts where not in spec
-    const collabCount = Math.floor(Math.random() * 5) + 1;
-    const pendingApprovals = Math.floor(Math.random() * 8);
+    const collabCount = project.collaboratorCount || 0;
+    const pendingApprovals = project.pendingCount || 0;
 
     return (
         <Link href={`/dashboard/projects/${project.id}`}>
@@ -224,7 +225,7 @@ function ProjectCard({ project, onDelete }: { project: Project; onDelete?: (id: 
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
                             <Users className="w-3.5 h-3.5" />
-                            <span>{collabCount} Collaborators</span>
+                            <span>{collabCount} {collabCount === 1 ? 'Collaborator' : 'Collaborators'}</span>
                         </div>
 
                         {pendingApprovals > 0 ? (

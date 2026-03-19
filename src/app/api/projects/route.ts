@@ -107,7 +107,47 @@ export async function GET(request: Request) {
         // 4. Sort all descending
         allProjects.sort((a, b) => new Date(b.created_at || b.$createdAt).getTime() - new Date(a.created_at || a.$createdAt).getTime());
 
-        return NextResponse.json({ projects: allProjects });
+        // 5. Fetch Real-time Counts for each project
+        const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
+        const collabCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!;
+        const assetsCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!;
+
+        const projectsWithStats = await Promise.all(allProjects.map(async (project) => {
+            try {
+                // Get collaborator count
+                const collabs = await databases.listDocuments(
+                    databaseId,
+                    collabCollId,
+                    [Query.equal("project_id", project.id), Query.limit(1)]
+                );
+                
+                // Get pending asset count
+                const pending = await databases.listDocuments(
+                    databaseId,
+                    assetsCollId,
+                    [
+                        Query.equal("project_id", project.id),
+                        Query.equal("status", ["draft", "in_review", "changes_requested", "pending", "Pending"]),
+                        Query.limit(1)
+                    ]
+                );
+                
+                return {
+                    ...project,
+                    collaboratorCount: collabs.total,
+                    pendingCount: pending.total
+                };
+            } catch (err) {
+                console.error(`Failed to fetch stats for project ${project.id}:`, err);
+                return {
+                    ...project,
+                    collaboratorCount: 0,
+                    pendingCount: 0
+                };
+            }
+        }));
+
+        return NextResponse.json({ projects: projectsWithStats });
     } catch (error: any) {
         console.error("API Fetch Projects Error:", error);
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
