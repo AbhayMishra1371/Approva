@@ -28,97 +28,53 @@ import {
     Bar,
 } from "recharts";
 
-const performanceData = [
-    { name: "Mon", pending: 20, approved: 10, rejected: 5 },
-    { name: "Tue", pending: 25, approved: 15, rejected: 8 },
-    { name: "Wed", pending: 35, approved: 20, rejected: 4 },
-    { name: "Thu", pending: 45, approved: 30, rejected: 6 },
-    { name: "Fri", pending: 60, approved: 45, rejected: 10 },
-    { name: "Sat", pending: 40, approved: 25, rejected: 3 },
-    { name: "Sun", pending: 25, approved: 15, rejected: 2 },
-];
-
-const assetTypesData = [
-    { name: "Images", value: 245 },
-    { name: "Videos", value: 120 },
-    { name: "Documents", value: 85 },
-    { name: "Other", value: 15 },
-];
-
-const recentApprovalsData = [
-    {
-        id: 1,
-        title: "Hero Banner v2",
-        user: "Sarah K.",
-        time: "2 min ago",
-        status: "Approved",
-        type: "image",
-    },
-    {
-        id: 2,
-        title: "Product Video",
-        user: "Mike R.",
-        time: "15 min ago",
-        status: "Pending",
-        type: "video",
-    },
-    {
-        id: 3,
-        title: "Brand Guidelines",
-        user: "Lisa M.",
-        time: "1 hour ago",
-        status: "Rejected",
-        type: "document",
-    },
-    {
-        id: 4,
-        title: "Social Media Kit",
-        user: "Tom H.",
-        time: "2 hours ago",
-        status: "Approved",
-        type: "image",
-    },
-];
-
 export default function DashboardPage() {
     const [invites, setInvites] = useState<any[]>([]);
     const [isAccepting, setIsAccepting] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Dynamic Stats State
+    const [stats, setStats] = useState({
+        totalAssets: 0,
+        pendingReview: 0,
+        approvedToday: 0,
+        rejectionRate: "0.0"
+    });
+    const [performanceData, setPerformanceData] = useState<any[]>([]);
+    const [assetTypesData, setAssetTypesData] = useState<any[]>([]);
+    const [recentApprovals, setRecentApprovals] = useState<any[]>([]);
 
     useEffect(() => {
-        const fetchInvites = async () => {
+        const fetchDashboardData = async () => {
+            setIsLoading(true);
             try {
-                const { account, databases } = createBrowserClient();
+                const { account } = createBrowserClient();
                 const user = await account.get();
                 if (!user?.email) return;
 
-                const invitesList = await databases.listDocuments(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID!,
-                    [Query.equal("email", user.email)]
-                );
+                // Single consolidated fetch for stats and invites
+                const { jwt } = await account.createJWT();
+                const statsRes = await fetch(`/api/dashboard/stats?t=${Date.now()}`, {
+                    headers: { "Authorization": `Bearer ${jwt}` },
+                    cache: 'no-store'
+                });
 
-                // Fetch project names for each invite
-                const invitesWithProjectNames = await Promise.all(
-                    invitesList.documents.map(async (invite: any) => {
-                        try {
-                            const project = await databases.getDocument(
-                                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-                                invite.project_id
-                            );
-                            return { ...invite, projects: { name: project.name } };
-                        } catch (err) {
-                            return { ...invite, projects: { name: "Unknown Project" } };
-                        }
-                    })
-                );
-
-                setInvites(invitesWithProjectNames);
+                if (statsRes.ok) {
+                    const data = await statsRes.json();
+                    setStats(data.stats);
+                    setPerformanceData(data.performanceData);
+                    setAssetTypesData(data.assetTypesData);
+                    setRecentApprovals(data.recentApprovals);
+                    setInvites(data.invites);
+                }
             } catch (err) {
-                // User may not be logged in yet or other error
+                console.error("Dashboard Fetch Error:", err);
+            } finally {
+                setIsLoading(false);
             }
         };
-        fetchInvites();
+
+        fetchDashboardData();
     }, []);
 
     const handleAcceptInvite = async (inviteId: string) => {
@@ -137,7 +93,8 @@ export default function DashboardPage() {
             if (res.ok) {
                 setInvites(invites.filter((inv) => inv.id !== inviteId));
                 toast.success("Invite accepted successfully!");
-                // Optionally refresh other dashboard data here
+                // Refresh data
+                window.location.reload();
             } else {
                 const data = await res.json();
                 toast.error(data.error || "Failed to accept invite");
@@ -197,28 +154,28 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                 <StatCard
                     title="Total Assets"
-                    value="532"
+                    value={stats.totalAssets.toString()}
                     trend="+12.5%"
                     trendUp={true}
                     icon={<FolderOpen className="w-5 h-5 text-purple-400" />}
                 />
                 <StatCard
                     title="Pending Review"
-                    value="47"
+                    value={stats.pendingReview.toString()}
                     trend="-8.2%"
                     trendUp={false}
                     icon={<Clock className="w-5 h-5 text-purple-400" />}
                 />
                 <StatCard
                     title="Approved Today"
-                    value="128"
+                    value={stats.approvedToday.toString()}
                     trend="+23.1%"
                     trendUp={true}
                     icon={<CheckCircle2 className="w-5 h-5 text-purple-400" />}
                 />
                 <StatCard
                     title="Rejection Rate"
-                    value="3.2%"
+                    value={`${stats.rejectionRate}%`}
                     trend="-1.5%"
                     trendUp={false}
                     icon={<AlertCircle className="w-5 h-5 text-red-400" />}
@@ -371,7 +328,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="flex flex-col gap-3">
-                    {recentApprovalsData.map((item) => (
+                    {recentApprovals.map((item: any) => (
                         <div
                             key={item.id}
                             className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#1e1f2b]/50 border border-[#1f202b] hover:bg-[#1e1f2b] transition-colors group cursor-pointer"
