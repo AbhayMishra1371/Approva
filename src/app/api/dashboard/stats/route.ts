@@ -27,7 +27,7 @@ export async function GET() {
         const collabIds = collabRes.documents.map(d => d.project_id);
         const allProjectIds = Array.from(new Set([...ownedIds, ...collabIds]));
 
-        console.log(`[DEBUG] Dashboard Stats for user ${user.$id} (${user.email}): Projects Count=${allProjectIds.length}`);
+        console.log(`[DEBUG] API: Dashboard for ${user.email} (${user.$id}) | Projects: ${allProjectIds.join(', ')}`);
 
         if (allProjectIds.length === 0) {
             return NextResponse.json({
