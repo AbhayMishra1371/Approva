@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
+
 import {
     FolderGit2,
     Plus,
@@ -120,14 +122,26 @@ export default function ProjectsPage() {
                     <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
                 </div>
             ) : projects.length === 0 ? (
-                <div className="bg-[#12131a] border border-[#1f202b] rounded-xl p-12 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-[#1e1f2b] rounded-2xl flex items-center justify-center mb-4">
-                        <FolderGit2 className="w-8 h-8 text-slate-400" />
+                <div className="bg-[#12131a] border border-[#1f202b] rounded-2xl p-16 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-b from-purple-500/5 to-transparent pointer-events-none" />
+
+                    <div className="relative mb-8">
+                        <div className="w-24 h-24 bg-white/5 rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl relative group">
+                            <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-110 opacity-50" />
+                            <Image
+                                src="/approvaavatar.png"
+                                alt="Approva Avatar"
+                                width={80}
+                                height={80}
+                                className="relative z-10 object-contain animate-float"
+                            />
+                        </div>
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">No projects yet</h3>
                     <p className="text-slate-400 max-w-sm mb-6">
                         Create your first project to start organizing assets and managing approvals with your clients.
                     </p>
+
                     <button
                         onClick={() => setIsModalOpen(true)}
                         className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-6 py-3 flex items-center gap-2 transition-colors font-medium"
