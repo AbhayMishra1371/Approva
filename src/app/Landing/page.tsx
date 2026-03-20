@@ -12,6 +12,7 @@ import { Features } from '@/components/sections/Features';
 import { Pricing } from '@/components/sections/Pricing';
 import { CTA } from '@/components/sections/CTA';
 import ModernLanding from '@/components/sections/ModernLanding';
+import SmoothScroll from '@/components/SmoothScroll';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -38,5 +39,10 @@ export default function LandingPage() {
     return <div className="min-h-screen bg-[#0b0c10]" />;
   }
 
-  return <ModernLanding />;
+  return (
+    <SmoothScroll>
+      <ModernLanding />
+    </SmoothScroll>
+  );
 }
+

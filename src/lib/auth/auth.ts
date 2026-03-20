@@ -30,8 +30,6 @@ export const getUser = async () => {
         const user = await account.get();
         return user;
     } catch (error: any) {
-        // Only log errors that aren't related to being a guest (missing account scope)
-        // This prevents console noise during redirects or unauthenticated states
         if (error?.code !== 401 && !error?.message?.includes('missing scopes')) {
             console.error("GetUser Error:", error?.message || error);
         }

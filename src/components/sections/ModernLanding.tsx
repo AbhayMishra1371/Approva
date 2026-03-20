@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { 
     ArrowRight, 
@@ -31,12 +33,19 @@ import '../MagicRings.css';
 const Nav = () => (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#0b0c10]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
-                    <Check className="text-white w-5 h-5 font-bold" />
+                <div className="flex items-center gap-2">
+                    <div className="relative w-10 h-10">
+                        <Image 
+                            src="/approva-logo.svg" 
+                            alt="Approva Logo" 
+                            fill
+                            className="object-contain"
+                        />
+                    </div>
+                    <span className="font-extrabold text-2xl tracking-tight text-white">Approva</span>
                 </div>
-                <span className="font-bold text-xl tracking-tight text-white">Approva</span>
-            </div>
+
+
             <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
                 <Link href="#features" className="hover:text-purple-400 transition-colors">Features</Link>
                 <Link href="#demo" className="hover:text-purple-400 transition-colors">Product</Link>
@@ -90,65 +99,65 @@ const HeroMockUI = () => {
                         {/* Asset Preview (Video/Image Mock) */}
                         <div className="w-full h-full bg-[#1a1b23] rounded-xl border border-white/5 relative overflow-hidden group">
                            {/* Animated Video Mockup */}
-                            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-transparent flex items-center justify-center">
-                                <Play size={48} className="text-white/20" />
+                            {/* Optimized Hero Image */}
+                            <div className="absolute inset-0 z-0">
+                                <Image 
+                                    src="/approva_dashboard_hero_1774028447650.png" 
+                                    alt="Approva Dashboard" 
+                                    fill
+                                    priority
+                                    className="object-cover opacity-80"
+                                    sizes="(max-w-7xl) 100vw"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-[#0d0e14] via-transparent to-transparent z-10" />
                             </div>
 
-                            {/* Animated Elements */}
-                            
-                            {/* 1. Annotation Box 1 */}
-                            <motion.div 
-                                key="ann-1"
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: 1, duration: 0.4 }}
-                                className="absolute top-[30%] left-[40%] w-32 h-20 border-2 border-purple-500 rounded-lg bg-purple-500/10 flex items-start justify-end p-1 shadow-lg shadow-purple-500/20"
-                            >
-                                <div className="w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center text-[10px] text-white">1</div>
-                            </motion.div>
+                            {/* Essential Overlay Elements (Keeping only the best ones) */}
+                            <div className="relative z-20 w-full h-full">
+                                {/* Annotation Box 1 */}
+                                <motion.div 
+                                    key="ann-1"
+                                    initial={{ opacity: 0, scale: 0.8 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: 1, duration: 0.4 }}
+                                    className="absolute top-[25%] left-[35%] w-32 h-20 border-2 border-purple-500 rounded-lg bg-purple-500/20 backdrop-blur-sm flex items-start justify-end p-1 shadow-lg shadow-purple-500/20"
+                                >
+                                    <div className="w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center text-[10px] text-white">1</div>
+                                </motion.div>
 
-                            {/* 2. Annotation Box 2 */}
-                            <motion.div 
-                                key="ann-2"
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: 1.5, duration: 0.4 }}
-                                className="absolute bottom-[25%] right-[20%] w-16 h-16 border-2 border-cyan-500 rounded-lg bg-cyan-500/10 flex items-start justify-end p-1 shadow-lg shadow-cyan-500/20"
-                            >
-                                <div className="w-4 h-4 rounded-full bg-cyan-500 flex items-center justify-center text-[10px] text-white">2</div>
-                            </motion.div>
+                                {/* Comment Bubble */}
+                                <motion.div 
+                                    key="comment-bubble"
+                                    initial={{ opacity: 0, y: 10, x: 20 }}
+                                    animate={{ opacity: 1, y: 0, x: 0 }}
+                                    transition={{ delay: 2.5, duration: 0.4 }}
+                                    className="absolute bottom-12 left-12 max-w-[200px] bg-white rounded-2xl rounded-bl-none p-3 shadow-2xl"
+                                >
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-[8px] font-bold text-purple-600">JD</div>
+                                        <span className="text-[10px] font-bold text-slate-900">John Doe</span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-600 leading-tight">Could we adjust the logo saturation? It feels a bit dull here.</p>
+                                </motion.div>
 
-                            {/* 3. Comment Bubble */}
-                            <motion.div 
-                                key="comment-bubble"
-                                initial={{ opacity: 0, y: 10, x: 20 }}
-                                animate={{ opacity: 1, y: 0, x: 0 }}
-                                transition={{ delay: 2.5, duration: 0.4 }}
-                                className="absolute bottom-10 left-10 max-w-[200px] bg-white rounded-2xl rounded-bl-none p-3 shadow-2xl"
-                            >
-                                <div className="flex items-center gap-2 mb-1">
-                                    <div className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center text-[8px] font-bold text-purple-600">JD</div>
-                                    <span className="text-[10px] font-bold text-slate-900">John Doe</span>
-                                </div>
-                                <p className="text-[11px] text-slate-600 leading-tight">Could we adjust the logo saturation? It feels a bit dull here.</p>
-                            </motion.div>
-
-                            {/* 4. Approval Badge */}
-                            <motion.div 
-                                key="approval-badge"
-                                initial={{ scale: 0, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                transition={{ delay: 4, type: 'spring', damping: 12 }}
-                                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center"
-                            >
-                                <div className="w-24 h-24 rounded-full bg-emerald-500/20 backdrop-blur-xl border border-emerald-500/30 flex items-center justify-center">
-                                    <CheckCircle className="text-emerald-500 w-12 h-12" />
-                                </div>
-                                <span className="mt-4 bg-emerald-500 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-xl shadow-emerald-500/40 border border-white/20">ASSET APPROVED</span>
-                            </motion.div>
+                                {/* Approval Badge */}
+                                <motion.div 
+                                    key="approval-badge"
+                                    initial={{ scale: 0, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ delay: 4, type: 'spring', damping: 12 }}
+                                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center"
+                                >
+                                    <div className="w-24 h-24 rounded-full bg-emerald-500/20 backdrop-blur-xl border border-emerald-500/30 flex items-center justify-center mb-4">
+                                        <CheckCircle className="text-emerald-500 w-12 h-12" />
+                                    </div>
+                                    <span className="bg-emerald-500 text-white px-5 py-2 rounded-full text-xs font-black shadow-2xl shadow-emerald-500/40 border border-white/20 uppercase tracking-widest">ASSET APPROVED</span>
+                                </motion.div>
+                            </div>
                         </div>
                     </div>
                 </div>
+
 
                 {/* Right Panel (Comments) */}
                 <div className="w-72 border-l border-white/5 bg-white/5 p-4 flex flex-col gap-4">
@@ -298,9 +307,17 @@ export default function ModernLanding() {
             </section>
 
             {/* --- Product Demo Steps --- */}
-            <section id="demo" className="py-24 md:py-40 bg-[#0d0e14]">
+            <motion.section 
+                id="demo" 
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                className="py-24 md:py-40 bg-[#0d0e14]"
+            >
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center mb-20">
+
                         <h2 className="text-3xl md:text-5xl font-black text-white mb-6 tracking-tight">How it works</h2>
                         <p className="text-slate-400 text-lg">Four steps to absolute clarity in your creative pipeline.</p>
                     </div>
@@ -418,12 +435,21 @@ export default function ModernLanding() {
                         </div>
                     </div>
                 </div>
-            </section>
+            </motion.section>
+
 
             {/* --- Features Grid --- */}
-            <section id="features" className="py-24 md:py-40">
+            <motion.section 
+                id="features" 
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                className="py-24 md:py-40"
+            >
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="max-w-3xl mb-20">
+
                         <h2 className="text-3xl md:text-5xl font-black text-white mb-6 leading-tight">Built for modern creative teams</h2>
                         <p className="text-slate-400 text-lg">Every feature is designed to eliminate ambiguity and keep production moving.</p>
                     </div>
@@ -473,15 +499,23 @@ export default function ModernLanding() {
                         ))}
                     </div>
                 </div>
-            </section>
+            </motion.section>
+
 
             {/* --- Collaboration Section --- */}
-            <section className="py-24 md:py-40 bg-black/40 relative">
+            <motion.section 
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                className="py-24 md:py-40 bg-black/40 relative"
+            >
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[600px] bg-purple-900/10 blur-[150px] -z-10" />
                 
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-col lg:flex-row items-center gap-16 md:gap-24">
                         <div className="flex-1 space-y-8">
+
                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold tracking-widest uppercase">
                                 <Users size={12} /> Team Collaboration
                             </div>
@@ -507,63 +541,34 @@ export default function ModernLanding() {
                             </div>
                         </div>
 
-                        <div className="flex-1 w-full bg-[#12131a] rounded-3xl border border-white/10 p-8 relative overflow-hidden h-[400px]">
-                            <div className="absolute top-0 right-0 p-4">
-                                <Activity className="text-slate-700" />
-                            </div>
-                            
-                            <div className="space-y-6">
-                                <motion.div 
-                                    initial={{ x: 50, opacity: 0 }}
-                                    whileInView={{ x: 0, opacity: 1 }}
-                                    transition={{ duration: 0.6, delay: 0.2 }}
-                                    className="bg-white/5 p-4 rounded-2xl border border-white/5 flex gap-4"
-                                >
-                                    <div className="w-10 h-10 rounded-full bg-purple-500 shrink-0" />
-                                    <div className="flex-1 space-y-2">
-                                        <div className="h-2 w-24 bg-white/20 rounded" />
-                                        <div className="h-2 w-full bg-white/10 rounded" />
-                                        <div className="h-2 w-3/4 bg-white/10 rounded" />
-                                    </div>
-                                </motion.div>
-
-                                <motion.div 
-                                    initial={{ x: 50, opacity: 0 }}
-                                    whileInView={{ x: 0, opacity: 1 }}
-                                    transition={{ duration: 0.6, delay: 0.4 }}
-                                    className="bg-white/5 p-4 rounded-2xl border border-white/5 flex gap-4 ml-8"
-                                >
-                                    <div className="w-10 h-10 rounded-full bg-blue-500 shrink-0" />
-                                    <div className="flex-1 space-y-2">
-                                        <div className="h-2 w-24 bg-white/20 rounded" />
-                                        <div className="h-2 w-full bg-white/10 rounded" />
-                                    </div>
-                                </motion.div>
-
-                                <motion.div 
-                                    initial={{ x: 50, opacity: 0 }}
-                                    whileInView={{ x: 0, opacity: 1 }}
-                                    transition={{ duration: 0.6, delay: 0.6 }}
-                                    className="bg-purple-600/10 p-4 rounded-2xl border border-purple-500/20 flex gap-4"
-                                >
-                                    <div className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center font-bold text-white tracking-widest text-[10px]">JD</div>
-                                    <div className="flex-1 space-y-2">
-                                        <div className="h-2 w-24 bg-purple-400 rounded" />
-                                        <div className="h-2 w-full bg-purple-500/40 rounded" />
-                                    </div>
-                                    <CheckCircle size={16} className="text-emerald-500 self-center" />
-                                </motion.div>
-                            </div>
+                        <div className="flex-1 w-full bg-[#12131a] rounded-3xl border border-white/10 p-2 relative overflow-hidden h-[450px]">
+                            <Image 
+                                src="/approva_collaboration_mockup_1774028464179.png" 
+                                alt="Collaboration Feedback" 
+                                fill
+                                className="object-cover opacity-90"
+                                sizes="(max-width: 768px) 100vw, 50vw"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#12131a] via-transparent to-transparent" />
                         </div>
                     </div>
                 </div>
-            </section>
+            </motion.section>
+
+
 
             {/* --- CTA Section --- */}
-            <section className="py-24 md:py-48 px-4 relative overflow-hidden">
+            <motion.section 
+                initial={{ opacity: 0, y: 50 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                className="py-24 md:py-48 px-4 relative overflow-hidden"
+            >
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-purple-600/10 rounded-full blur-[120px] -z-10" />
                 
                 <div className="max-w-4xl mx-auto text-center px-8 py-20 bg-gradient-to-b from-white/5 to-transparent rounded-[3rem] border border-white/10 relative overflow-hidden">
+
                     <div className="absolute inset-0 bg-noise opacity-[0.03] pointer-events-none" />
                     
                     <h2 className="text-4xl md:text-6xl font-black text-white mb-8 tracking-tight">Ready to ship <br /> better content?</h2>
@@ -591,18 +596,26 @@ export default function ModernLanding() {
                         <span>Cancel anytime</span>
                     </div>
                 </div>
-            </section>
+            </motion.section>
+
 
             {/* --- Footer --- */}
             <footer className="py-12 border-t border-white/5">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-8">
-                        <div className="flex items-center gap-2 grayscale brightness-200 opacity-50">
-                            <div className="w-6 h-6 rounded-lg bg-white flex items-center justify-center text-black">
-                                <Check size={14} className="font-bold" />
-                            </div>
-                            <span className="font-bold text-lg tracking-tighter text-white">Approva</span>
+                    <div className="flex items-center gap-2 grayscale brightness-200 opacity-80">
+                        <div className="relative w-8 h-8">
+                            <Image 
+                                src="/approva-logo.svg" 
+                                alt="Approva Logo" 
+                                fill
+                                className="object-contain"
+                            />
                         </div>
+                        <span className="font-extrabold text-xl tracking-tight text-white">Approva</span>
+                    </div>
+
+
                         
                         <div className="flex items-center gap-8 text-sm font-medium text-slate-600">
                             <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
