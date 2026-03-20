@@ -659,17 +659,21 @@ export default function ProjectDetailPage() {
                                     <label htmlFor="role" className="block text-sm font-medium text-slate-300 mb-1.5">
                                         Role
                                     </label>
-                                    <select
-                                        id="role"
-                                        className="w-full bg-[#0b0c10] border border-[#1f202b] rounded-xl px-4 py-2.5 text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all font-medium appearance-none"
+                                    <Select
                                         value={inviteRole}
-                                        onChange={(e) => setInviteRole(e.target.value)}
+                                        onValueChange={(val) => setInviteRole(val)}
                                         disabled={isInviting}
                                     >
-                                        <option value="admin">Admin - Can manage roles and settings</option>
-                                        <option value="reviewer">Reviewer - Can comment and approve</option>
-                                        <option value="viewer">Viewer - Read-only access</option>
-                                    </select>
+                                        <SelectTrigger className="w-full bg-[#0b0c10] border-[#1f202b] rounded-xl h-11 text-white focus:ring-purple-500">
+                                            <SelectValue placeholder="Select a role" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-[#12131a] border-[#1f202b] text-white">
+                                            <SelectItem value="admin">Admin - Can manage roles and settings</SelectItem>
+                                            <SelectItem value="reviewer">Reviewer - Can comment and approve</SelectItem>
+                                            <SelectItem value="viewer">Viewer - Read-only access</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+
                                 </div>
                             </div>
                             <div className="flex gap-3">
