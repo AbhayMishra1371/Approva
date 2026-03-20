@@ -23,7 +23,21 @@ import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query, ID, Permission, Role } from "appwrite";
 import { toast } from "sonner";
 import { AnnotationCanvas, Annotation } from "@/components/projects/AnnotationCanvas";
+
 import { CommentThread, Comment } from "@/components/projects/CommentThread";
+
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
+
 
 type Asset = {
     id: string;
@@ -60,7 +74,8 @@ export default function AssetDetailPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [userEmail, setUserEmail] = useState<string>("");
     const [currentColor, setCurrentColor] = useState("#a855f7");
-    const [activeSidebarTab, setActiveSidebarTab] = useState<'comments' | 'fields'>('fields');
+    const [activeSidebarTab, setActiveSidebarTab] = useState<'comments' | 'fields'>('comments');
+
 
     // General Comments States
     const [generalComments, setGeneralComments] = useState<GeneralComment[]>([]);
@@ -70,6 +85,12 @@ export default function AssetDetailPage() {
     // Versions State
     const [versions, setVersions] = useState<Asset[]>([]);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+
+    // Feedback Modal State
+    const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+    const [feedbackText, setFeedbackText] = useState("");
+    const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+
 
     // Role state
     const [role, setRole] = useState<'owner' | 'admin' | 'reviewer' | 'viewer' | null>(null);
@@ -463,22 +484,22 @@ export default function AssetDetailPage() {
     };
 
     const handleStatusChange = async (newStatus: string) => {
+        if (newStatus === 'rejected' || newStatus === 'changes_requested') {
+            setPendingStatus(newStatus);
+            setFeedbackText("");
+            setIsFeedbackModalOpen(true);
+            return;
+        }
+        
+        // Direct approval or other status
+        await confirmStatusChange(newStatus, newStatus === 'approved' ? "Asset approved." : "");
+    };
+
+    const confirmStatusChange = async (newStatus: string, comment: string) => {
         setIsLoading(true);
         try {
             const { account } = createBrowserClient();
             const { jwt } = await account.createJWT();
-
-            // Prompt for a comment if rejecting/requesting changes
-            let comment = "";
-            if (newStatus === 'rejected' || newStatus === 'changes_requested') {
-                comment = prompt("Please provide a reason for this decision:") || "";
-                if (!comment) {
-                    setIsLoading(false);
-                    return; // Abort if they cancel the prompt
-                }
-            } else if (newStatus === 'approved') {
-                comment = "Asset approved.";
-            }
 
             const res = await fetch(`/api/projects/${projectId}/assets/${assetId}/status`, {
                 method: "POST",
@@ -532,6 +553,7 @@ export default function AssetDetailPage() {
                     }
                 }
                 toast.success(`Asset marked as ${newStatus.replace('_', ' ')}`);
+                setIsFeedbackModalOpen(false);
             } else {
                 const errData = await res.json();
                 toast.error(errData.error || "Failed to update status");
@@ -543,6 +565,7 @@ export default function AssetDetailPage() {
             setIsLoading(false);
         }
     };
+
 
     const handleDownload = (filePath: string) => {
         try {
@@ -746,218 +769,144 @@ export default function AssetDetailPage() {
 
                 {/* Enhanced Info / Comment Sidebar */}
                 <div className="w-full lg:w-96 bg-[#1a1b23] border-t lg:border-t-0 lg:border-l border-[#1f202b] flex flex-col z-20 overflow-hidden h-full">
-                    {/* Tabs */}
-                    <div className="flex p-3 bg-[#1a1b23] border-b border-[#252632]">
-                        <div className="flex w-full bg-[#12131a] rounded-lg p-1 border border-[#252632]">
-                            <button
-                                onClick={() => setActiveSidebarTab('comments')}
-                                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${activeSidebarTab === 'comments' ? 'bg-[#252632] text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}
-                            >
-                                Comments
-                            </button>
-                            <button
-                                onClick={() => setActiveSidebarTab('fields')}
-                                className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${activeSidebarTab === 'fields' ? 'bg-[#252632] text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}
-                            >
-                                Fields
-                            </button>
+                    {/* Asset Info Summary (Always Visible) */}
+                    <div className="p-4 border-b border-[#252632] space-y-4">
+                        <div className="bg-[#1f202b]/60 rounded-xl border border-[#2a2b36] p-4">
+                            <h2 className="text-white font-bold text-sm leading-tight mb-2 truncate">
+                                {asset.file_name}
+                            </h2>
+                            <p className="text-slate-400 text-[10px] mb-4">
+                                Uploaded on {new Date(asset.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(asset.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                            </p>
+
+                            <div className="grid grid-cols-2 gap-px bg-[#2a2b36] rounded-lg overflow-hidden border border-[#2a2b36]">
+                                <div className="bg-[#1f202b] p-2 text-center">
+                                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Format</div>
+                                    <div className="text-white font-bold text-xs">{asset.file_type.split('/')[1]?.toUpperCase() || 'UNKNOWN'}</div>
+                                </div>
+                                <div className="bg-[#1f202b] p-2 text-center">
+                                    <div className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Status</div>
+                                    <div className={`text-xs font-bold uppercase tracking-wider 
+                                        ${asset.status === 'approved' ? 'text-emerald-400' :
+                                            asset.status === 'rejected' ? 'text-rose-400' :
+                                                asset.status === 'changes_requested' ? 'text-amber-400' :
+                                                    'text-blue-400'}`}>
+                                        {asset.status ? asset.status.replace('_', ' ') : 'Review'}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
+
                     {/* Tab Content */}
                     <div className="flex-1 flex flex-col overflow-hidden p-4 space-y-4">
-                        {activeSidebarTab === 'comments' ? (
-                            <div className="h-full flex flex-col">
-                                <div className="bg-[#2a2b36]/30 p-3 rounded-lg border border-[#2a2b36]/50 mb-4 bg-stripes">
-                                    <h3 className="text-white font-medium text-xs flex items-center gap-1.5 mb-1">
-                                        <Info className="w-3.5 h-3.5 text-purple-400" /> Canvas Annotations
-                                    </h3>
-                                    <p className="text-[10px] text-slate-400 leading-snug">
-                                        Click a pin on the image to view specific canvas comments. Or, leave general feedback below.
-                                    </p>
-                                </div>
+                        <div className="h-full flex flex-col">
+                            <div className="bg-[#2a2b36]/30 p-3 rounded-lg border border-[#2a2b36]/50 mb-4 bg-stripes">
+                                <h3 className="text-white font-medium text-xs flex items-center gap-1.5 mb-1">
+                                    <Info className="w-3.5 h-3.5 text-purple-400" /> Canvas Annotations
+                                </h3>
+                                <p className="text-[10px] text-slate-400 leading-snug">
+                                    Click a pin on the image to view specific canvas comments. Or, leave general feedback below.
+                                </p>
+                            </div>
 
-                                <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-1 custom-scrollbar">
-                                    {generalComments.length === 0 ? (
-                                        <div className="text-center py-8 text-slate-500 text-xs italic border border-dashed border-[#2a2b36] rounded-xl relative">
-                                            No general comments yet. Be the first to share your thoughts!
-                                        </div>
-                                    ) : (
-                                        generalComments.map(comment => (
-                                            <div key={comment.$id} className="bg-[#1f202b] rounded-xl p-3 border border-[#2a2b36]">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 uppercase">
-                                                            {comment.user_email?.[0] || '?'}
-                                                        </div>
-                                                        <span className="text-xs font-bold text-white">{comment.user_email?.split('@')[0] || 'Unknown User'}</span>
+                            <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-1 custom-scrollbar">
+                                {generalComments.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-500 text-xs italic border border-dashed border-[#2a2b36] rounded-xl relative">
+                                        No general comments yet. Be the first to share your thoughts!
+                                    </div>
+                                ) : (
+                                    generalComments.map(comment => (
+                                        <div key={comment.$id} className="bg-[#1f202b] rounded-xl p-3 border border-[#2a2b36]">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 uppercase">
+                                                        {comment.user_email?.[0] || '?'}
                                                     </div>
-                                                    <span className="text-[10px] text-slate-500 mt-0.5">
-                                                        {new Date(comment.created_at).toLocaleDateString()}
-                                                    </span>
+                                                    <span className="text-xs font-bold text-white">{comment.user_email?.split('@')[0] || 'Unknown User'}</span>
                                                 </div>
-                                                <p className="text-xs text-slate-300 whitespace-pre-wrap ml-8">{comment.text}</p>
+                                                <span className="text-[10px] text-slate-500 mt-0.5">
+                                                    {new Date(comment.created_at).toLocaleDateString()}
+                                                </span>
                                             </div>
-                                        ))
-                                    )}
-                                </div>
-
-                                {/* Input Box */}
-                                {role !== 'viewer' && (
-                                    <>
-                                        <div className="mt-auto shrink-0 relative bg-[#12131a] border border-[#2a2b36] rounded-xl focus-within:border-purple-500 transition-colors">
-                                            <textarea
-                                                value={newGeneralComment}
-                                                onChange={(e) => setNewGeneralComment(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                                        e.preventDefault();
-                                                        handleSendGeneralComment();
-                                                    }
-                                                }}
-                                                placeholder="Write a general comment..."
-                                                className="w-full bg-transparent p-3 pr-10 text-sm text-white focus:outline-none resize-none placeholder-slate-600 custom-scrollbar block min-h-[80px]"
-                                                disabled={isSubmittingGeneralComment}
-                                            />
-                                            <button
-                                                onClick={handleSendGeneralComment}
-                                                disabled={!newGeneralComment.trim() || isSubmittingGeneralComment}
-                                                className="absolute bottom-2 right-2 p-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center"
-                                            >
-                                                {isSubmittingGeneralComment ? (
-                                                    <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
-                                                ) : (
-                                                    <Send className="w-4 h-4" />
-                                                )}
-                                            </button>
+                                            <p className="text-xs text-slate-300 whitespace-pre-wrap ml-8">{comment.text}</p>
                                         </div>
-                                        <div className="text-[10px] text-slate-500 mt-2 text-right">
-                                            Press <span className="font-bold text-slate-400">Enter</span> to send
-                                        </div>
-                                    </>
+                                    ))
                                 )}
                             </div>
-                        ) : (
-                            <>
-                                {/* Main Asset Card */}
-                                <div className="bg-[#1f202b]/60 rounded-xl border border-[#2a2b36] p-4">
-                                    <h2 className="text-white font-bold text-sm leading-tight mb-2 truncate">
-                                        {asset.file_name}
-                                    </h2>
-                                    <p className="text-slate-400 text-xs mb-4">
-                                        Uploaded on {new Date(asset.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(asset.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                                    </p>
 
-                                    <div className="grid grid-cols-2 gap-px bg-[#2a2b36] rounded-lg overflow-hidden border border-[#2a2b36]">
-                                        <div className="bg-[#1f202b] p-3 text-center">
-                                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Format</div>
-                                            <div className="text-white font-bold text-sm">{asset.file_type.split('/')[1]?.toUpperCase() || 'UNKNOWN'}</div>
-                                        </div>
-                                        <div className="bg-[#1f202b] p-3 text-center">
-                                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Resolution</div>
-                                            <div className="text-white font-bold text-sm">--</div>
-                                        </div>
+                            {/* Input Box */}
+                            {role !== 'viewer' && (
+                                <>
+                                    <div className="mt-auto shrink-0 relative bg-[#12131a] border border-[#2a2b36] rounded-xl focus-within:border-purple-500 transition-colors">
+                                        <textarea
+                                            value={newGeneralComment}
+                                            onChange={(e) => setNewGeneralComment(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    handleSendGeneralComment();
+                                                }
+                                            }}
+                                            placeholder="Write a general comment..."
+                                            className="w-full bg-transparent p-3 pr-10 text-sm text-white focus:outline-none resize-none placeholder-slate-600 custom-scrollbar block min-h-[80px]"
+                                            disabled={isSubmittingGeneralComment}
+                                        />
+                                        <button
+                                            onClick={handleSendGeneralComment}
+                                            disabled={!newGeneralComment.trim() || isSubmittingGeneralComment}
+                                            className="absolute bottom-2 right-2 p-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center"
+                                        >
+                                            {isSubmittingGeneralComment ? (
+                                                <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                                <Send className="w-4 h-4" />
+                                            )}
+                                        </button>
                                     </div>
-                                </div>
-
-                                {/* Mini Cards Row */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    {/* Seen By */}
-                                    <div className="bg-[#1f202b]/60 rounded-xl border border-[#2a2b36] p-3">
-                                        <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-2">
-                                            <User className="w-3.5 h-3.5" />
-                                            <span>Seen By</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 bg-[#2a2b36]/50 rounded-lg p-1.5 border border-[#2a2b36]">
-                                            <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center text-[9px] font-bold text-white shrink-0">
-                                                IN
-                                            </div>
-                                            <span className="text-xs text-white font-medium truncate">Invision Studio</span>
-                                        </div>
+                                    <div className="text-[10px] text-slate-500 mt-2 text-right">
+                                        Press <span className="font-bold text-slate-400">Enter</span> to send
                                     </div>
+                                </>
+                            )}
+                        </div>
 
-                                    {/* Status */}
-                                    <div className="bg-[#1f202b]/60 rounded-xl border border-[#2a2b36] p-3">
-                                        <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-2">
-                                            <SquareSquare className="w-3.5 h-3.5" />
-                                            <span>Status</span>
-                                        </div>
-                                        <div className={`inline-flex items-center text-xs font-semibold px-2 py-1 rounded-md border 
-                                            ${asset.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                                asset.status === 'rejected' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                                                    asset.status === 'changes_requested' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                                        'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
-                                            {asset.status ? asset.status.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : 'In Review'}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* All Fields Section */}
-                                <div className="pt-2">
-                                    <div className="flex items-center justify-between mb-3 px-1">
-                                        <h3 className="text-white font-bold text-sm flex items-center gap-1.5">
-                                            All Fields <span className="text-slate-500 font-normal">(7)</span>
-                                        </h3>
-                                        <div className="flex items-center gap-2 text-slate-400">
-                                            <button className="hover:text-white transition-colors"><ListFilter className="w-4 h-4" /></button>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-1.5 relative">
-                                        {/* Field Items */}
-                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-3 flex items-center justify-between group cursor-pointer hover:bg-[#252632] transition-colors">
-                                            <div className="flex items-center gap-2 text-slate-300 text-xs font-medium">
-                                                <div className="w-4 h-4 rounded border border-slate-600 flex items-center justify-center shrink-0">
-                                                    <CheckCircle className="w-3 h-3 text-slate-400" />
-                                                </div>
-                                                Alpha Channel
-                                            </div>
-                                            <div className="w-4 h-4 rounded bg-indigo-500 flex items-center justify-center">
-                                                <CheckCircle className="w-3 h-3 text-white" />
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex flex-col gap-1.5 group cursor-pointer hover:bg-[#252632] transition-colors min-h-[52px]">
-                                            <div className="flex items-center gap-2 text-slate-300 text-xs font-medium">
-                                                <User className="w-3.5 h-3.5 text-slate-500" />
-                                                Assignee
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex items-center gap-2 group cursor-pointer hover:bg-[#252632] transition-colors">
-                                            <div className="w-3.5 h-3.5 rounded border border-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-400 shrink-0">1</div>
-                                            <span className="text-slate-300 text-xs font-medium">Audio Bit Depth</span>
-                                        </div>
-
-                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex items-center gap-2 group cursor-pointer hover:bg-[#252632] transition-colors">
-                                            <div className="w-3.5 h-3.5 rounded border border-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-400 shrink-0">1</div>
-                                            <span className="text-slate-300 text-xs font-medium">Audio Bit Rate</span>
-                                        </div>
-
-                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex items-center gap-2 group cursor-pointer hover:bg-[#252632] transition-colors">
-                                            <div className="w-3.5 h-3.5 rounded border border-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-400 shrink-0">1</div>
-                                            <span className="text-slate-300 text-xs font-medium">Audio Channels</span>
-                                        </div>
-
-                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex flex-col gap-1.5 group cursor-pointer hover:bg-[#252632] transition-colors min-h-[52px]">
-                                            <div className="flex items-center gap-2 text-slate-300 text-xs font-medium">
-                                                <div className="w-3.5 h-3.5 rounded border border-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-400 shrink-0">T</div>
-                                                Audio Codec
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-[#1f202b]/60 rounded-lg border border-[#2a2b36] p-[10px] pl-3 flex items-center gap-2 group cursor-pointer hover:bg-[#252632] transition-colors">
-                                            <div className="w-3.5 h-3.5 rounded border border-slate-600 flex items-center justify-center text-[8px] font-bold text-slate-400 shrink-0">1</div>
-                                            <span className="text-slate-300 text-xs font-medium">Audio Sample Rate</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </>
-                        )}
                     </div>
                 </div>
             </main>
+            {/* Feedback Modal for Rejection/Changes */}
+            <AlertDialog open={isFeedbackModalOpen} onOpenChange={setIsFeedbackModalOpen}>
+                <AlertDialogContent className="bg-[#12131a] border-[#1f202b] text-white">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Provide Feedback</AlertDialogTitle>
+                        <AlertDialogDescription className="text-slate-400">
+                            Please explain why you are {pendingStatus === 'rejected' ? 'rejecting' : 'requesting changes for'} this asset. This will be shared with the team.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4">
+                        <Textarea 
+                            placeholder="Type your feedback here..." 
+                            value={feedbackText}
+                            onChange={(e) => setFeedbackText(e.target.value)}
+                            className="bg-[#0b0c10] border-[#1f202b] text-white placeholder:text-slate-600 focus:border-purple-500 focus:ring-purple-500"
+                        />
+                    </div>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-[#1e1f2b] border-[#2a2b36] hover:bg-[#2a2b36] hover:text-white text-slate-300">Cancel</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={() => pendingStatus && confirmStatusChange(pendingStatus, feedbackText)}
+                            disabled={!feedbackText.trim() || isLoading}
+                            className={`${pendingStatus === 'rejected' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'} text-white font-bold px-6`}
+                        >
+                            {isLoading ? "Submitting..." : "Submit Feedback"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             {/* New Version Upload Modal */}
+
             {isUploadModalOpen && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
                     <div className="bg-[#12131a] border border-[#1f202b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
