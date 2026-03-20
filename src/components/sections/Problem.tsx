@@ -27,7 +27,7 @@ export const Problem = () => {
     <section className="py-32 relative bg-transparent bg-grid-pattern overflow-hidden" id="process">
       {/* Background Glow */}
       <div className="absolute top-1/2 left-1/2 -z-10 bg-primary/5 blur-[120px] w-full h-full rounded-full -translate-x-1/2 -translate-y-1/2" />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-24 text-center max-w-2xl mx-auto">
           <p className="text-primary font-bold uppercase tracking-widest text-[10px] mb-4">The Workflow Gap</p>
@@ -41,7 +41,7 @@ export const Problem = () => {
           {problems.map((item, i) => (
             <div key={i} className="group glass p-8 rounded-3xl hover:-translate-y-2 transition-all duration-500 relative overflow-hidden">
               <div className={`absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br ${item.color} blur-[50px] opacity-10 group-hover:opacity-20 transition-opacity`} />
-              
+
               <div className={`w-12 h-12 bg-gradient-to-br ${item.color} rounded-xl flex items-center justify-center mb-8 shadow-xl border border-white/5`}>
                 {item.icon}
               </div>

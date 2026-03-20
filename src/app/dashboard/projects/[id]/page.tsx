@@ -320,9 +320,6 @@ export default function ProjectDetailPage() {
                                 Active
                             </span>
                         </div>
-                        <p className="text-slate-400 text-sm">
-                            Project ID: {id}
-                        </p>
                     </div>
 
                     {/* Role-based Actions */}

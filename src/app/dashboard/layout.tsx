@@ -26,6 +26,18 @@ export default function DashboardLayout({
     const router = useRouter();
     const pathname = usePathname();
 
+    // Determine if sidebar should be minimized
+    const isAssetPage = pathname?.includes("/projects/") && pathname?.includes("/assets/");
+    const [isMinimized, setIsMinimized] = useState(false);
+
+    useEffect(() => {
+        if (isAssetPage) {
+            setIsMinimized(true);
+        } else {
+            setIsMinimized(false);
+        }
+    }, [isAssetPage]);
+
     useEffect(() => {
         const fetchUser = async () => {
             const currentUser = await getUser();
@@ -106,22 +118,24 @@ export default function DashboardLayout({
             )}
 
             {/* Sidebar */}
-            <aside className={`fixed inset-y-0 right-0 md:left-0 md:right-auto z-50 w-64 bg-[#12131a] flex flex-col border-l md:border-l-0 md:border-r border-[#1f202b] transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? "translate-x-0" : "translate-x-full"}`}>
+            <aside className={`fixed inset-y-0 right-0 md:left-0 md:right-auto z-50 ${isMinimized ? "md:w-20" : "md:w-64"} bg-[#12131a] flex flex-col border-l md:border-l-0 md:border-r border-[#1f202b] transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 ${isMobileMenuOpen ? "translate-x-0" : "translate-x-full"}`}>
                 {/* Logo Area */}
-                <div className="p-6 flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-purple-600/10 flex items-center justify-center overflow-hidden border border-purple-500/20">
+                <div className={`p-6 flex items-center ${isMinimized ? "justify-center" : "gap-3"}`}>
+                    <div className="w-9 h-9 rounded-xl bg-purple-600/10 flex items-center justify-center overflow-hidden border border-purple-500/20 shrink-0">
                         <img 
                             src="/approva-logo.svg" 
                             alt="Approva Logo" 
                             className="w-6 h-6 object-contain"
                         />
                     </div>
-                    <div>
-                        <h1 className="font-bold text-lg text-white leading-tight">
-                            Hello {userName}
-                        </h1>
-                        <p className="text-xs text-slate-400">Asset Approval</p>
-                    </div>
+                    {!isMinimized && (
+                        <div className="animate-fade-in whitespace-nowrap overflow-hidden">
+                            <h1 className="font-bold text-lg text-white leading-tight">
+                                Hello {userName}
+                            </h1>
+                            <p className="text-xs text-slate-400">Asset Approval</p>
+                        </div>
+                    )}
                 </div>
 
 
@@ -139,20 +153,21 @@ export default function DashboardLayout({
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                                className={`flex items-center ${isMinimized ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
                                     ? "bg-[#1e1f2b] text-white"
                                     : "text-slate-400 hover:bg-[#1e1f2b] hover:text-white"
                                     }`}
+                                title={isMinimized ? link.name : ""}
                             >
-                                <link.icon className={`w-4 h-4 ${isActive ? "text-purple-400" : ""}`} />
-                                {link.name}
+                                <link.icon className={`w-4 h-4 shrink-0 ${isActive ? "text-purple-400" : ""}`} />
+                                {!isMinimized && <span className="animate-fade-in whitespace-nowrap overflow-hidden">{link.name}</span>}
                             </Link>
                         );
                     })}
 
-                    <div className="pt-8 pb-2">
-                        <div className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                            System
+                    <div className={`pt-8 pb-2 ${isMinimized ? "flex justify-center" : ""}`}>
+                        <div className={`px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider ${isMinimized ? "w-8 border-b border-slate-700/50 pb-1 text-[0px]" : ""}`}>
+                            {!isMinimized && "System"}
                         </div>
                     </div>
                     {[
@@ -164,13 +179,14 @@ export default function DashboardLayout({
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                                className={`flex items-center ${isMinimized ? "justify-center" : "gap-3"} px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
                                     ? "bg-[#1e1f2b] text-white"
                                     : "text-slate-400 hover:bg-[#1e1f2b] hover:text-white"
                                     }`}
+                                title={isMinimized ? link.name : ""}
                             >
-                                <link.icon className={`w-4 h-4 ${isActive ? "text-purple-400" : ""}`} />
-                                {link.name}
+                                <link.icon className={`w-4 h-4 shrink-0 ${isActive ? "text-purple-400" : ""}`} />
+                                {!isMinimized && <span className="animate-fade-in whitespace-nowrap overflow-hidden">{link.name}</span>}
                             </Link>
                         );
                     })}
@@ -180,7 +196,7 @@ export default function DashboardLayout({
                 <div className="p-4 border-t border-[#1f202b] relative" ref={dropdownRef}>
                     <div
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className={`flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer ${isDropdownOpen ? 'bg-[#1e1f2b]' : 'hover:bg-[#1e1f2b]'}`}
+                        className={`flex items-center ${isMinimized ? "justify-center" : "gap-3"} p-2 rounded-lg transition-colors cursor-pointer ${isDropdownOpen ? 'bg-[#1e1f2b]' : 'hover:bg-[#1e1f2b]'}`}
                     >
                         <div className="w-9 h-9 rounded-full bg-purple-600/20 text-purple-400 flex items-center justify-center font-semibold text-sm shrink-0 overflow-hidden">
                             {userAvatar ? (
@@ -189,13 +205,15 @@ export default function DashboardLayout({
                                 userInitial
                             )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-medium text-white truncate">
-                                {userName}
-                            </h3>
-                            <p className="text-xs text-slate-400 truncate">{userRole}</p>
-                        </div>
-                        <Settings className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${isDropdownOpen ? 'rotate-90' : ''}`} />
+                        {!isMinimized && (
+                            <div className="flex-1 min-w-0 animate-fade-in overflow-hidden">
+                                <h3 className="text-sm font-medium text-white truncate">
+                                    {userName}
+                                </h3>
+                                <p className="text-xs text-slate-400 truncate">{userRole}</p>
+                            </div>
+                        )}
+                        {!isMinimized && <Settings className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ${isDropdownOpen ? 'rotate-90' : ''}`} />}
                     </div>
 
                     {/* Dropdown Menu */}

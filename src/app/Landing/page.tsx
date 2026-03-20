@@ -11,8 +11,7 @@ import { Process } from '@/components/sections/Process';
 import { Features } from '@/components/sections/Features';
 import { Pricing } from '@/components/sections/Pricing';
 import { CTA } from '@/components/sections/CTA';
-import { Footer } from '@/components/sections/Footer';
-
+import ModernLanding from '@/components/sections/ModernLanding';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -39,17 +38,5 @@ export default function LandingPage() {
     return <div className="min-h-screen bg-[#0b0c10]" />;
   }
 
-  return (
-    <div className="min-h-screen bg-transparent font-sans text-white overflow-x-hidden">
-      <Navbar />
-      <Hero />
-      <TrustedBy />
-      <Problem />
-      <Process />
-      <Features />
-      <Pricing />
-      <CTA />
-      <Footer />
-    </div>
-  );
+  return <ModernLanding />;
 }
