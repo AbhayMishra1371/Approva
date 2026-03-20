@@ -1,24 +1,35 @@
 "use client";
 
-import { ReactLenis } from '@studio-freight/react-lenis';
-import { ReactNode } from 'react';
+import { useEffect, ReactNode } from 'react';
+import Lenis from 'lenis';
 
 interface SmoothScrollProps {
   children: ReactNode;
 }
 
 export default function SmoothScroll({ children }: SmoothScrollProps) {
-  return (
-    <ReactLenis root options={{ 
-      lerp: 0.1, 
+  useEffect(() => {
+    const lenis = new Lenis({
+      lerp: 0.1,
       duration: 1.5,
       smoothWheel: true,
       wheelMultiplier: 1,
       touchMultiplier: 2,
       infinite: false,
-    }}>
-      {children as any}
-    </ReactLenis>
+    });
 
-  );
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+
+    requestAnimationFrame(raf);
+
+    return () => {
+      lenis.destroy();
+    };
+  }, []);
+
+  return <>{children}</>;
 }
+
