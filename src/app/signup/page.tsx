@@ -3,6 +3,8 @@
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { OAuthProvider } from "appwrite";
 import { Github, Chrome, ArrowLeft, UserPlus, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import Image from "next/image";
+
 import Link from "next/link";
 import { useState } from "react";
 import { signUp, login, getJwt } from "@/lib/auth/auth";
@@ -143,9 +145,17 @@ function SignupForm() {
         <div className="glass p-6 md:p-8 rounded-[2rem] relative overflow-hidden border-white/5 shadow-2xl">
           <div className="relative z-10">
             <div className="mb-6 text-center">
-              <div className="w-12 h-12 bg-primary/10 flex items-center justify-center rounded-xl mx-auto mb-4 border border-primary/20 shadow-lg shadow-primary/10">
-                <UserPlus className="w-6 h-6 text-primary" />
+              <div className="w-16 h-16 bg-white/5 flex items-center justify-center rounded-2xl mx-auto mb-4 border border-white/10 shadow-2xl relative group">
+                <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full scale-75 group-hover:scale-100 transition-transform duration-500" />
+                <Image 
+                  src="/approva-logo.svg" 
+                  alt="Approva Logo" 
+                  width={40} 
+                  height={40} 
+                  className="object-contain relative z-10" 
+                />
               </div>
+
               <h1 className="text-2xl font-bold mb-2 tracking-tight">Create Account</h1>
               <p className="text-slate-400 font-medium text-xs">Join the next generation of asset approval</p>
             </div>
