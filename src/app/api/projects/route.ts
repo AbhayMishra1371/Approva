@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
         const { databases } = await createAdminClient();
 
-        console.log(`[DEBUG] Fetching projects for current user ID: ${user.$id} (${user.email})`);
+
 
         // 1. Fetch owned projects
         let ownedProjects: any[] = [];
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
                 .filter((doc: any) => doc.owner_id === user.$id)
                 .map((doc: any) => ({ ...doc, id: doc.$id, role: 'owner' }));
             
-            console.log(`[DEBUG] Owned projects found after filtering: ${ownedProjects.length} (Total raw results: ${ownedRes.documents.length})`);
+
         } catch (e) {
             console.warn("Could not query owned projects directly:", e);
         }
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
                 [Query.equal("user_id", user.$id)]
             );
             
-            console.log(`[DEBUG] Raw collaborator documents found for user_id ${user.$id}: ${collabsRes.documents.length}`);
+
             
             // SECURITY: Manual secondary filter to ensure user_id matches
             const filteredCollabs = collabsRes.documents.filter((doc: any) => doc.user_id === user.$id);
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
                 [Query.limit(5000)]
             );
             
-            console.log(`[DEBUG] Fallback fetch total records: ${allCollabs.documents.length}`);
+
             
             allCollabs.documents
                 .filter((doc: any) => doc.user_id === user.$id)
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
                     collabProjectIds.push(doc.project_id);
                     collabRoles[doc.project_id] = doc.role;
                 });
-            console.log(`[DEBUG] Fallback filtered collaborator projects count: ${collabProjectIds.length}`);
+
         }
 
         // 3. Fetch missing projects

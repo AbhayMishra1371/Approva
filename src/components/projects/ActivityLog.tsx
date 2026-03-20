@@ -34,14 +34,14 @@ type LogEntry = {
 };
 
 export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
-    console.log("DEBUG: ActivityLog component mounted", { projectId, assetId });
+
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchLogs = async () => {
-            console.log("DEBUG: Fetching logs", { projectId, assetId });
+
             setIsLoading(true);
             setError(null);
             try {
@@ -65,7 +65,7 @@ export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
                 }
 
                 const data = await fetchRes.json();
-                console.log("DEBUG: Logs fetched successfully:", data.documents.length);
+
                 setLogs(data.documents as unknown as LogEntry[]);
             } catch (err: any) {
                 console.error("DEBUG: Error fetching activity logs:", err);

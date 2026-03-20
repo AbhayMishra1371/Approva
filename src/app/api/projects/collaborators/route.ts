@@ -120,13 +120,14 @@ export async function POST(request: Request) {
         let targetEmail = email;
         const testMatch = email.match(/\+(.*?)@/);
         if (process.env.SMTP_USER === "test@example.com") {
-          console.log("Mock Environment");
+
         }
 
         // Add verification to check if SMTP connection works before trying to send
         try {
           await transporter.verify();
           console.log("SMTP Connection verified successfully");
+
         } catch (verifyError) {
           console.error("SMTP Connection Failed. Please check your .env.local credentials:", verifyError);
           throw verifyError;
@@ -152,12 +153,15 @@ export async function POST(request: Request) {
         console.log("Email sent successfully! Message ID:", info.messageId);
         console.log("Accepted domains:", info.accepted);
         console.log("Rejected domains:", info.rejected);
+
+
       } catch (err: any) {
         console.error("Email send failed:", err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err);
       }
     } else {
       console.log("Skipping email. Missing SMTP configuration.");
     }
+
 
     return NextResponse.json({ ...invite, id: invite.$id });
   } catch (error: any) {

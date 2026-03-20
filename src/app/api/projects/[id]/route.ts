@@ -75,6 +75,7 @@ export async function DELETE(
                 if (deletedCount > 0) {
                     console.log(`[CASCADE] Deleted ${deletedCount} documents from ${label} (${collectionId})`);
                 }
+
             } catch (err) {
                 console.warn(`[CASCADE] Error in ${label} deletion:`, err);
             }
@@ -96,11 +97,11 @@ export async function DELETE(
             allAssets = allAssets.concat(assetResponse.documents);
             if (assetResponse.documents.length < limit) {
                 hasMoreAssetsToFetch = false;
-            } else {
-                offset += limit;
             }
         }
         console.log(`[CASCADE] Found ${allAssets.length} assets for project ${projectId}`);
+
+
 
         for (const asset of allAssets) {
             // Delete asset_versions linked to this asset

@@ -27,7 +27,7 @@ export async function GET(request: Request) {
                 .filter((doc: any) => doc.owner_id === user.$id)
                 .map((doc: any) => ({ ...doc, id: doc.$id }));
             
-            console.log(`[DEBUG] Assets API: Owned projects for ${user.$id}: ${ownedProjects.length} (Total raw: ${ownedRes.documents.length})`);
+
         } catch (e) {
             console.warn("Could not query owned projects:", e);
         }
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
             filteredCollabs.forEach((doc: any) => {
                 collabProjectIds.push(doc.project_id);
             });
-            console.log(`[DEBUG] Assets API: Collaborator project IDs: ${collabProjectIds.length}`);
+
         } catch (err) {
             // Fallback
             const allCollabs = await databases.listDocuments(

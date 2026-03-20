@@ -94,7 +94,7 @@ export default function AssetDetailPage() {
 
     // Role state
     const [role, setRole] = useState<'owner' | 'admin' | 'reviewer' | 'viewer' | null>(null);
-    console.log("DEBUG: UI rendering with role:", role, "readOnly calculated as:", role === 'viewer');
+
 
     const colors = [
         { name: 'Purple', value: '#a855f7' },
@@ -204,11 +204,11 @@ export default function AssetDetailPage() {
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    console.log("DEBUG: Role API response:", data);
+
                     if (data.callerRole) {
                         setRole(data.callerRole as 'owner' | 'admin' | 'reviewer' | 'viewer');
                     } else {
-                        console.log("DEBUG: callerRole is missing in API response =>", data);
+
                     }
                 } else {
                     console.error("DEBUG: Failed to fetch role", await res.text());
@@ -222,7 +222,7 @@ export default function AssetDetailPage() {
         }
     }, [projectId]);
 
-    console.log("DEBUG - Asset Render State: ", { role, assetStatus: asset?.status });
+
 
     const fetchComments = async (annotationId: string) => {
         try {

@@ -37,6 +37,7 @@ export async function POST(request: Request) {
         // 2. Email validation - strictly enforce that the logged in user matches the invite
         if (inviteObj.email !== user.email) {
             console.log("INVITE EMAIL MISMATCH:", { inviteEmail: inviteObj.email, userEmail: user.email });
+
             return NextResponse.json({
                 error: "This invitation was sent to a different email address than the one you are currently logged in with.",
                 expectedEmail: inviteObj.email,
@@ -104,6 +105,7 @@ export async function POST(request: Request) {
                 newPermissions
             );
             console.log("Successfully granted project permissions to user");
+
         } catch (permError) {
             console.error("Failed to update project permissions:", permError);
         }

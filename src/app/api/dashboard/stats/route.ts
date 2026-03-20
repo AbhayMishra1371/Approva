@@ -27,7 +27,7 @@ export async function GET() {
         const collabIds = collabRes.documents.map(d => d.project_id);
         const allProjectIds = Array.from(new Set([...ownedIds, ...collabIds]));
 
-        console.log(`[DEBUG] API: Dashboard for ${user.email} (${user.$id}) | Projects: ${allProjectIds.join(', ')}`);
+
 
         if (allProjectIds.length === 0) {
             return NextResponse.json({
@@ -144,7 +144,7 @@ export async function GET() {
             Query.limit(5)
         ]);
 
-        console.log(`[DEBUG] Dashboard Stats: Total=${totalAssets}, Pending=${pendingReview}, ApprovedToday=${approvedToday}, Recent=${recentApprovalsRes.documents.length}`);
+
 
         return NextResponse.json({
             stats: { totalAssets, pendingReview, approvedToday, rejectionRate },
