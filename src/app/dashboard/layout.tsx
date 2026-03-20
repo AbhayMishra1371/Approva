@@ -57,7 +57,7 @@ export default function DashboardLayout({
                             },
                             body: JSON.stringify({ token: pendingInviteToken })
                         });
-                        
+
                         if (res.ok) {
                             const data = await res.json();
                             localStorage.removeItem("pendingInviteToken");
@@ -122,9 +122,9 @@ export default function DashboardLayout({
                 {/* Logo Area */}
                 <div className={`p-6 flex items-center ${isMinimized ? "justify-center" : "gap-3"}`}>
                     <div className="w-9 h-9 rounded-xl bg-purple-600/10 flex items-center justify-center overflow-hidden border border-purple-500/20 shrink-0">
-                        <img 
-                            src="/approva-logo.svg" 
-                            alt="Approva Logo" 
+                        <img
+                            src="/approva-logo.svg"
+                            alt="Approva Logo"
                             className="w-6 h-6 object-contain"
                         />
                     </div>

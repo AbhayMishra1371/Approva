@@ -2,7 +2,8 @@
 
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { OAuthProvider } from "appwrite";
-import { Github, Chrome, ArrowLeft, Lock, Mail, Sparkles } from "lucide-react";
+import { Chrome, ArrowLeft, Lock, Mail, Sparkles } from "lucide-react";
+
 import Image from "next/image";
 
 
@@ -90,7 +91,8 @@ function LoginForm() {
     }
   };
 
-  const handleOAuthLogin = async (provider: "google" | "github") => {
+  const handleOAuthLogin = async (provider: "google") => {
+
     setIsLoading(provider);
     try {
       const { account } = createBrowserClient();
@@ -102,7 +104,7 @@ function LoginForm() {
         localStorage.setItem("pendingInviteToken", token);
       }
 
-      const successUrl = token 
+      const successUrl = token
         ? `${window.location.origin}/invitations/accept?token=${token}`
         : `${window.location.origin}/dashboard`;
 
@@ -137,16 +139,14 @@ function LoginForm() {
         <div className="glass p-6 md:p-8 rounded-[2rem] relative overflow-hidden border-white/5 shadow-2xl">
           <div className="relative z-10">
             <div className="mb-6 text-center">
-              <div className="w-16 h-16 bg-white/5 flex items-center justify-center rounded-2xl mx-auto mb-4 border border-white/10 shadow-2xl relative group">
-                <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full scale-75 group-hover:scale-100 transition-transform duration-500" />
-                <Image 
-                  src="/approva-logo.svg" 
-                  alt="Approva Logo" 
-                  width={40} 
-                  height={40} 
-                  className="object-contain relative z-10" 
-                />
-              </div>
+              <Image 
+                src="/approva-logo 2.png" 
+                alt="Approva Logo" 
+                width={64} 
+                height={64} 
+                className="mx-auto mb-4 object-contain" 
+              />
+
 
               <h1 className="text-2xl font-bold mb-2 tracking-tight">Welcome back</h1>
               <p className="text-slate-400 font-medium text-xs">Sign in to your creative workspace</p>
@@ -170,20 +170,9 @@ function LoginForm() {
                 )}
                 Continue with Google
               </button>
-
-              <button
-                onClick={() => handleOAuthLogin("github")}
-                disabled={!!isLoading}
-                className="w-full bg-[#111118]/80 hover:bg-[#111118] text-white px-6 py-3 rounded-xl font-bold text-xs transition-all border border-white/10 flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed shadow-xl"
-              >
-                {isLoading === "github" ? (
-                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <Github className="w-4 h-4" />
-                )}
-                Continue with GitHub
-              </button>
             </div>
+
+
 
             <div className="my-6 flex items-center gap-4">
               <div className="h-px flex-1 bg-white/5" />
@@ -249,15 +238,20 @@ function LoginForm() {
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-secondary/10 to-transparent blur-3xl -ml-12 -mb-12 opacity-40 pointer-events-none" />
         </div>
 
-        {/* Branding Footer */}
-        <div className="mt-6 text-center">
-          <div className="inline-flex items-center gap-2 font-bold text-lg tracking-tight text-white/20 group cursor-default">
-            <div className="w-6 h-6 bg-white/5 rounded-lg flex items-center justify-center border border-white/10 group-hover:border-primary/30 transition-all">
-              <div className="w-3 h-3 border-2 border-white/30 rounded-sm rotate-45 group-hover:border-primary group-hover:rotate-12 transition-all" />
-            </div>
-            <span className="text-sm group-hover:text-white transition-colors">Approva<span className="text-primary/40 group-hover:text-primary italic">.</span></span>
+        <div className="mt-8 text-center">
+          <div className="inline-flex items-center gap-2 font-bold text-lg tracking-tight text-white group cursor-default">
+            <Image 
+              src="/approva-logo.svg" 
+              alt="Approva Logo" 
+              width={24} 
+              height={24} 
+              className="object-contain" 
+            />
+            <span className="text-sm">Approva<span className="text-primary italic">.</span></span>
           </div>
         </div>
+
+
       </div>
     </div>
   );
@@ -270,3 +264,4 @@ export default function LoginPage() {
     </Suspense>
   );
 }
+
