@@ -26,6 +26,7 @@ type LogEntry = {
     project_name?: string;
     user_id: string;
     user_email: string;
+    user_name?: string;
     action: string;
     entity_type: string;
     entity_id: string;
@@ -213,7 +214,7 @@ export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
 
                 {logs.map((log) => {
                     const details = getActionDetails(log);
-                    const userName = log.user_email ? log.user_email.split('@')[0] : (log.user_id || "Someone");
+                    const userName = log.user_name || (log.user_email ? log.user_email.split('@')[0] : (log.user_id || "Someone"));
 
                     return (
                         <div key={log.$id} className="relative flex items-start gap-4 group">

@@ -11,7 +11,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { databases } = await createAdminClient();
+        const { databases, users } = await createAdminClient();
         const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
         const projectsCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!;
         const collabsCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!;
@@ -65,13 +65,30 @@ export async function GET(request: Request) {
             queries
         );
 
-        // 4. Attach project names to logs
-        const logsWithProjectNames = logsRes.documents.map((log: any) => ({
+        // Fetch user names
+        const uniqueUserIds = Array.from(new Set(logsRes.documents.filter(log => log.user_id).map(log => log.user_id)));
+        const userMap: Record<string, string> = {};
+        
+        await Promise.all(
+            uniqueUserIds.map(async (uid: any) => {
+                try {
+                    const u = await users.get(uid);
+                    userMap[uid] = u.name || u.email || 'Unknown User';
+                } catch (e) {
+                    console.warn(`Could not fetch user ${uid}`, e);
+                    userMap[uid] = 'Unknown User';
+                }
+            })
+        );
+
+        // 4. Attach project names and user names to logs
+        const enhancedLogs = logsRes.documents.map((log: any) => ({
             ...log,
-            project_name: projectMap[log.project_id] || "Unknown Project"
+            project_name: projectMap[log.project_id] || "Unknown Project",
+            user_name: userMap[log.user_id] || log.user_email || log.user_id
         }));
 
-        return NextResponse.json({ documents: logsWithProjectNames }, { status: 200 });
+        return NextResponse.json({ documents: enhancedLogs }, { status: 200 });
 
     } catch (error: any) {
         console.error("Global Activity API Error:", error);
