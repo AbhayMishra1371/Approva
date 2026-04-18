@@ -35,6 +35,7 @@ interface CommentThreadProps {
     readOnly?: boolean;
     currentUserId?: string;
     annotationOwnerId?: string;
+    role?: 'owner' | 'admin' | 'reviewer' | 'viewer' | null;
 }
 
 export const CommentThread: React.FC<CommentThreadProps> = ({
@@ -49,7 +50,8 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     annotationName,
     readOnly = false,
     currentUserId,
-    annotationOwnerId
+    annotationOwnerId,
+    role
 }) => {
     const [newComment, setNewComment] = useState("");
 
@@ -73,7 +75,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                         <button
                             onClick={onResolve}
                             className="p-1.5 hover:bg-emerald-500/10 text-emerald-500 rounded-lg transition-colors"
-                            title="Mark as Resolved"
+                            title="Approve Annotation"
                         >
                             <CheckCircle className="w-4 h-4" />
                         </button>

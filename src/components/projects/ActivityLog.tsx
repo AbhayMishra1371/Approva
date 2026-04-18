@@ -132,6 +132,12 @@ export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
                     text: `commented on ${m.file_name || "an asset"}`,
                     color: "bg-indigo-500/10 border-indigo-500/20"
                 };
+            case "resolved_annotation":
+                return {
+                    icon: <CheckCircle className="w-4 h-4 text-emerald-400" />,
+                    text: `approved an annotation on ${m.file_name || "an asset"}`,
+                    color: "bg-emerald-500/10 border-emerald-500/20"
+                };
             case "approved_asset":
                 return {
                     icon: <CheckCircle className="w-4 h-4 text-emerald-400" />,

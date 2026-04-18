@@ -136,18 +136,20 @@ export default function AssetDetailPage() {
                         annotationsCollectionId,
                         [Query.equal("asset_id", assetId)]
                     );
-                    setAnnotations(annDocs.documents.map(doc => ({
-                        $id: doc.$id,
-                        x: doc.x,
-                        y: doc.y,
-                        width: doc.width,
-                        height: doc.height,
-                        status: doc.status,
-                        name: doc.name || undefined,
-                        color: doc.color || '#a855f7',
-                        user_id: doc.user_id,
-                        created_at: doc.$createdAt
-                    })));
+                    setAnnotations(annDocs.documents
+                        .filter(doc => doc.status !== 'resolved')
+                        .map(doc => ({
+                            $id: doc.$id,
+                            x: doc.x,
+                            y: doc.y,
+                            width: doc.width,
+                            height: doc.height,
+                            status: doc.status,
+                            name: doc.name || undefined,
+                            color: doc.color || '#a855f7',
+                            user_id: doc.user_id,
+                            created_at: doc.$createdAt
+                        })));
                 } catch (e) {
                     console.warn("Annotations collection might not exist yet. Please create it in Appwrite console.", e);
                 }
@@ -375,7 +377,9 @@ export default function AssetDetailPage() {
         if (!selectedAnnotation?.$id) return;
 
         try {
-            const { databases } = createBrowserClient();
+            const { databases, account } = createBrowserClient();
+            const user = await account.get();
+
             await databases.updateDocument(
                 process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
                 annotationsCollectionId,
@@ -383,12 +387,41 @@ export default function AssetDetailPage() {
                 { status: 'resolved' }
             );
 
-            setAnnotations(annotations.map(a =>
-                a.$id === selectedAnnotation.$id ? { ...a, status: 'resolved' } : a
-            ));
-            setSelectedAnnotation({ ...selectedAnnotation, status: 'resolved' });
+            // Create Activity Log
+            try {
+                await databases.createDocument(
+                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
+                    ID.unique(),
+                    {
+                        project_id: projectId,
+                        user_id: user.$id,
+                        user_email: user.email,
+                        action: "resolved_annotation",
+                        entity_type: "annotation",
+                        entity_id: selectedAnnotation.$id,
+                        metadata: JSON.stringify({ 
+                            file_name: asset?.file_name,
+                            annotation_name: selectedAnnotation.name 
+                        })
+                    },
+                    [
+                        Permission.read(Role.users()),
+                        Permission.update(Role.user(user.$id)),
+                        Permission.delete(Role.user(user.$id))
+                    ]
+                );
+            } catch (logError) {
+                console.error("Failed to log resolve activity:", logError);
+            }
+
+            setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
+            setSelectedAnnotation(null);
+            setComments([]);
+            toast.success("Annotation approved and removed");
         } catch (e) {
             console.error("Failed to resolve annotation:", e);
+            toast.error("Failed to approve annotation");
         }
     };
 
@@ -761,6 +794,7 @@ export default function AssetDetailPage() {
                                     status={ann.status}
                                     currentUserId={currentUserId}
                                     annotationOwnerId={ann.user_id}
+                                    role={role}
                                 />
                             )}
                         />
