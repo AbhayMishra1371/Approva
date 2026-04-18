@@ -33,6 +33,8 @@ interface CommentThreadProps {
     status: 'pending' | 'resolved';
     annotationName?: string;
     readOnly?: boolean;
+    currentUserId?: string;
+    annotationOwnerId?: string;
 }
 
 export const CommentThread: React.FC<CommentThreadProps> = ({
@@ -45,7 +47,9 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     onDeleteComment,
     status,
     annotationName,
-    readOnly = false
+    readOnly = false,
+    currentUserId,
+    annotationOwnerId
 }) => {
     const [newComment, setNewComment] = useState("");
 
@@ -74,7 +78,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                             <CheckCircle className="w-4 h-4" />
                         </button>
                     )}
-                    {!readOnly && (
+                    {!readOnly && (currentUserId === annotationOwnerId) && (
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <button
@@ -131,7 +135,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                                             {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
-                                    {!readOnly && (
+                                    {!readOnly && currentUserId && comment.user_id === currentUserId && (
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                                 <button

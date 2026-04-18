@@ -12,6 +12,7 @@ export type Annotation = {
     height: number;
     status: 'pending' | 'resolved';
     color: string;
+    user_id?: string;
     created_at: string;
 };
 

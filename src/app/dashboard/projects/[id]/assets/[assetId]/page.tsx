@@ -73,6 +73,7 @@ export default function AssetDetailPage() {
     const [comments, setComments] = useState<Comment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [userEmail, setUserEmail] = useState<string>("");
+    const [currentUserId, setCurrentUserId] = useState<string>("");
     const [currentColor, setCurrentColor] = useState("#a855f7");
     const [activeSidebarTab, setActiveSidebarTab] = useState<'comments' | 'fields'>('comments');
 
@@ -118,6 +119,7 @@ export default function AssetDetailPage() {
                 // Fetch User
                 const user = await account.get();
                 setUserEmail(user.email);
+                setCurrentUserId(user.$id);
 
                 // Fetch Asset
                 const assetDoc = await databases.getDocument(
@@ -143,6 +145,7 @@ export default function AssetDetailPage() {
                         status: doc.status,
                         name: doc.name || undefined,
                         color: doc.color || '#a855f7',
+                        user_id: doc.user_id,
                         created_at: doc.$createdAt
                     })));
                 } catch (e) {
@@ -262,7 +265,8 @@ export default function AssetDetailPage() {
                     width: newAnn.width,
                     height: newAnn.height,
                     status: 'pending',
-                    color: newAnn.color
+                    color: newAnn.color,
+                    user_id: currentUserId
                 }
             );
 
@@ -755,6 +759,8 @@ export default function AssetDetailPage() {
                                     onDelete={handleDeleteAnnotation}
                                     onDeleteComment={handleDeleteComment}
                                     status={ann.status}
+                                    currentUserId={currentUserId}
+                                    annotationOwnerId={ann.user_id}
                                 />
                             )}
                         />
