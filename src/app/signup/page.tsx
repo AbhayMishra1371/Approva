@@ -147,12 +147,12 @@ function SignupForm() {
         <div className="glass p-6 md:p-8 rounded-[2rem] relative overflow-hidden border-white/5 shadow-2xl">
           <div className="relative z-10">
             <div className="mb-6 text-center">
-              <Image 
-                src="/approva-logo 2.png" 
-                alt="Approva Logo" 
-                width={64} 
-                height={64} 
-                className="mx-auto mb-4 object-contain" 
+              <Image
+                src="/approva-logo 2.png"
+                alt="Approva Logo"
+                width={64}
+                height={64}
+                className="mx-auto mb-4 object-contain"
               />
 
 
@@ -249,12 +249,12 @@ function SignupForm() {
 
         <div className="mt-8 text-center">
           <div className="inline-flex items-center gap-2 font-bold text-lg tracking-tight text-white group cursor-default">
-            <Image 
-              src="/approva-logo.svg" 
-              alt="Approva Logo" 
-              width={24} 
-              height={24} 
-              className="object-contain" 
+            <Image
+              src="/approva-logo.svg"
+              alt="Approva Logo"
+              width={24}
+              height={24}
+              className="object-contain"
             />
             <span className="text-sm">Approva<span className="text-primary italic">.</span></span>
           </div>

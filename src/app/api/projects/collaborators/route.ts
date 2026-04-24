@@ -162,6 +162,39 @@ export async function POST(request: Request) {
       console.log("Skipping email. Missing SMTP configuration.");
     }
 
+    /* Create Notification for the invited user if they exist */
+    try {
+      const { users: adminUsers } = await createAdminClient();
+      const userList = await adminUsers.list([Query.equal("email", email)]);
+
+      if (userList.total > 0) {
+        const targetUser = userList.users[0];
+        const notificationCollId = process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATION_COLLECTION_ID || "notification";
+
+        const doc = await databases.createDocument(
+          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+          notificationCollId,
+          ID.unique(),
+          {
+            user_id: targetUser.$id,
+            type: "invite",
+            title: "New Project Invitation",
+            message: `${user.email} invited you to collaborate on "${project.name}" as ${role}.`,
+            link: `/invite?token=${inviteToken}`,
+            is_read: false,
+            actor_id: user.$id,
+            project_id: projectId,
+            created_at: new Date().toISOString()
+          }
+        );
+        console.log("SUCCESS: Created notification for user:", targetUser.$id, "Doc ID:", doc.$id);
+      } else {
+        console.log("INFO: No user found for notification with email:", email);
+      }
+    } catch (notifErr) {
+      console.error("ERROR: Failed to create invite notification:", notifErr);
+    }
+
 
     return NextResponse.json({ ...invite, id: invite.$id });
   } catch (error: any) {
@@ -236,25 +269,55 @@ export async function GET(request: Request) {
     const collaborators = await Promise.all(collabsRes.documents.map(async (doc) => {
       let email = "User_" + doc.user_id.substring(0, 4);
       let name = "Unknown User";
-      if (doc.user_id === user.$id) {
-        email = user.email;
-        name = user.name || user.email.split("@")[0] || "User";
-      } else {
+      let username = "";
+      let avatarUrl = "";
+
+      try {
+        const profile = await databases.getDocument(
+          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+          "profile",
+          doc.user_id
+        );
+        email = profile.email || email;
+        name = profile.full_name || name;
+        username = profile.username || (email.includes('@') ? email.split('@')[0] : "");
+        avatarUrl = profile.avatar_url || "";
+        
+        // If profile is incomplete, supplement with Auth data
+        if (name === "Unknown User" || !email || email.startsWith("User_")) {
+            try {
+                const targetUser = await users.get(doc.user_id);
+                if (!email || email.startsWith("User_")) email = targetUser.email;
+                if (name === "Unknown User") name = targetUser.name || targetUser.email.split('@')[0];
+                if (!username) username = targetUser.email.split('@')[0];
+            } catch (uErr) {}
+        }
+      } catch (e) {
+        // Profile missing — get from Appwrite Auth users
         try {
-          const targetUser = await users.get(doc.user_id);
-          email = targetUser.email || email;
-          name = targetUser.name || targetUser.email.split("@")[0] || "User";
-        } catch (e) {
-          console.error("Failed to fetch user:", doc.user_id);
+            const targetUser = await users.get(doc.user_id);
+            email = targetUser.email;
+            name = targetUser.name || targetUser.email.split('@')[0];
+            username = targetUser.email.split('@')[0];
+        } catch (userErr) {
+            // Fallback for current user (might be faster)
+            if (doc.user_id === user.$id) {
+                email = user.email;
+                name = user.name || user.email.split('@')[0];
+                username = user.email.split('@')[0];
+            }
         }
       }
+
       return {
         id: doc.$id,
         user_id: doc.user_id,
         role: doc.role,
         created_at: doc.$createdAt,
         email,
-        name
+        name,
+        username,
+        avatar_url: avatarUrl
       };
     }));
 

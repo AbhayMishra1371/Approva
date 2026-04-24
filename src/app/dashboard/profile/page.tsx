@@ -14,13 +14,15 @@ import {
     MessageSquare,
     CheckCircle2,
     Clock,
-    UserPlus
+    UserPlus,
+    AtSign
 } from "lucide-react";
 import { getUser, updateName, getJwt } from "@/lib/auth/auth";
 import { toast } from "sonner";
 
 export default function ProfilePage() {
     const [user, setUser] = useState<any>(null);
+    const [profile, setProfile] = useState<any>(null);
     const [activities, setActivities] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditingName, setIsEditingName] = useState(false);
@@ -35,6 +37,19 @@ export default function ProfilePage() {
                 if (currentUser) {
                     setUser(currentUser);
                     setNewName(currentUser.name);
+
+                    // Fetch profile document
+                    try {
+                        const { databases } = await import("@/lib/appwrite/client").then(m => m.createBrowserClient());
+                        const profileDoc = await databases.getDocument(
+                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                            "profile",
+                            currentUser.$id
+                        );
+                        setProfile(profileDoc);
+                    } catch (e) {
+                        console.error("Failed to fetch profile document", e);
+                    }
 
                     // Fetch user activity
                     const jwt = await getJwt();
@@ -209,6 +224,10 @@ export default function ProfilePage() {
                                     </div>
                                 )}
                                 <p className="text-slate-400 text-sm flex items-center justify-center gap-2">
+                                    <AtSign className="w-3.5 h-3.5 text-slate-500" />
+                                    {profile?.username || user.email.split('@')[0]}
+                                </p>
+                                <p className="text-slate-400 text-sm flex items-center justify-center gap-2">
                                     <Mail className="w-3.5 h-3.5 text-slate-500" />
                                     {user.email}
                                 </p>
@@ -274,7 +293,7 @@ export default function ProfilePage() {
                                             <div className={`mt-1.5 w-10 h-10 rounded-full flex items-center justify-center shrink-0 z-10 border-4 border-[#12131a] ${getActivityColor(activity.action)} shadow-lg transition-transform group-hover:scale-110`}>
                                                 {getActivityIcon(activity.action)}
                                             </div>
-                                            
+
                                             <div className="flex-1 bg-[#1e1f2b]/40 border border-[#2a2b36]/40 p-5 rounded-2xl hover:bg-[#1e1f2b]/80 hover:border-purple-500/20 transition-all group-hover:shadow-lg group-hover:-translate-y-1">
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                                                     <div className="text-sm text-slate-200 leading-relaxed">

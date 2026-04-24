@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -82,6 +82,12 @@ export default function AssetDetailPage() {
     const [generalComments, setGeneralComments] = useState<GeneralComment[]>([]);
     const [newGeneralComment, setNewGeneralComment] = useState("");
     const [isSubmittingGeneralComment, setIsSubmittingGeneralComment] = useState(false);
+
+    const [collaborators, setCollaborators] = useState<any[]>([]);
+    const [showGeneralMentions, setShowGeneralMentions] = useState(false);
+    const [generalMentionSearch, setGeneralMentionSearch] = useState("");
+    const [generalMentionIndex, setGeneralMentionIndex] = useState(-1);
+    const [generalMentionedUserIds, setGeneralMentionedUserIds] = useState<string[]>([]);
 
     // Versions State
     const [versions, setVersions] = useState<Asset[]>([]);
@@ -212,8 +218,9 @@ export default function AssetDetailPage() {
 
                     if (data.callerRole) {
                         setRole(data.callerRole as 'owner' | 'admin' | 'reviewer' | 'viewer');
-                    } else {
-
+                    }
+                    if (data.collaborators) {
+                        setCollaborators(data.collaborators);
                     }
                 } else {
                     console.error("DEBUG: Failed to fetch role", await res.text());
@@ -316,7 +323,7 @@ export default function AssetDetailPage() {
     };
 
 
-    const handleAddComment = async (text: string) => {
+    const handleAddComment = async (text: string, mentions?: string[]) => {
         if (!selectedAnnotation?.$id) return;
 
         try {
@@ -331,7 +338,8 @@ export default function AssetDetailPage() {
                     annotation_id: selectedAnnotation.$id,
                     user_id: user.$id,
                     user_email: user.email,
-                    text: text
+                    text: text,
+                    mentions: JSON.stringify(mentions || [])
                 }
             );
 
@@ -340,8 +348,9 @@ export default function AssetDetailPage() {
                 user_id: user.$id,
                 user_email: user.email,
                 text: text,
-                created_at: new Date().toISOString()
-            }]);
+                created_at: new Date().toISOString(),
+                mentions: mentions || []
+            } as any]);
 
             // Create Activity Log
             try {
@@ -366,6 +375,33 @@ export default function AssetDetailPage() {
                 );
             } catch (logError) {
                 console.error("Failed to log comment activity:", logError);
+            }
+
+            // Create notifications for mentioned users
+            if (mentions && mentions.length > 0) {
+                for (const targetUserId of mentions) {
+                    if (targetUserId === user.$id) continue;
+                    try {
+                        await databases.createDocument(
+                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                            process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATION_COLLECTION_ID || "notification",
+                            ID.unique(),
+                            {
+                                user_id: targetUserId,
+                                type: "mention",
+                                title: "New Mention",
+                                message: `${user.name || user.email} mentioned you in an annotation comment on "${asset?.file_name}".`,
+                                link: `/dashboard/projects/${projectId}/assets/${assetId}`,
+                                is_read: false,
+                                actor_id: user.$id,
+                                project_id: projectId,
+                                asset_id: assetId
+                            }
+                        );
+                    } catch (err) {
+                        console.error("Failed to notify mentioned user:", targetUserId, err);
+                    }
+                }
             }
         } catch (e) {
             console.error("Failed to save comment:", e);
@@ -400,9 +436,9 @@ export default function AssetDetailPage() {
                         action: "resolved_annotation",
                         entity_type: "annotation",
                         entity_id: selectedAnnotation.$id,
-                        metadata: JSON.stringify({ 
+                        metadata: JSON.stringify({
                             file_name: asset?.file_name,
-                            annotation_name: selectedAnnotation.name 
+                            annotation_name: selectedAnnotation.name
                         })
                     },
                     [
@@ -413,6 +449,31 @@ export default function AssetDetailPage() {
                 );
             } catch (logError) {
                 console.error("Failed to log resolve activity:", logError);
+            }
+
+            // Create Notification for the annotation author
+            try {
+                if (selectedAnnotation.user_id !== user.$id) {
+                    await databases.createDocument(
+                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                        process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATION_COLLECTION_ID || "notification",
+                        ID.unique(),
+                        {
+                            user_id: selectedAnnotation.user_id,
+                            type: "approval",
+                            title: "Annotation Approved",
+                            message: `${user.name || user.email} approved your annotation "${selectedAnnotation.name}" on ${asset?.file_name}.`,
+                            link: `/dashboard/projects/${projectId}/assets/${assetId}`,
+                            is_read: false,
+                            actor_id: user.$id,
+                            project_id: projectId,
+                            asset_id: assetId,
+                            created_at: new Date().toISOString()
+                        }
+                    );
+                }
+            } catch (notifErr) {
+                console.error("Failed to create annotation notification:", notifErr);
             }
 
             setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
@@ -500,7 +561,8 @@ export default function AssetDetailPage() {
                     asset_id: assetId,
                     user_id: user.$id,
                     user_email: user.email,
-                    text: newGeneralComment.trim()
+                    text: newGeneralComment.trim(),
+                    mentions: JSON.stringify(generalMentionedUserIds)
                 }
             );
 
@@ -509,16 +571,102 @@ export default function AssetDetailPage() {
                 user_id: user.$id,
                 user_email: user.email,
                 text: newGeneralComment.trim(),
-                created_at: new Date().toISOString()
-            }]);
+                created_at: new Date().toISOString(),
+                mentions: generalMentionedUserIds
+            } as any]);
+
+            // Create notifications for mentioned users
+            if (generalMentionedUserIds.length > 0) {
+                for (const targetUserId of generalMentionedUserIds) {
+                    if (targetUserId === user.$id) continue;
+                    try {
+                        await databases.createDocument(
+                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
+                            process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATION_COLLECTION_ID || "notification",
+                            ID.unique(),
+                            {
+                                user_id: targetUserId,
+                                type: "mention",
+                                title: "New Mention",
+                                message: `${user.name || user.email} mentioned you in a general comment on "${asset?.file_name}".`,
+                                link: `/dashboard/projects/${projectId}/assets/${assetId}`,
+                                is_read: false,
+                                actor_id: user.$id,
+                                project_id: projectId,
+                                asset_id: assetId
+                            }
+                        );
+                    } catch (err) {
+                        console.error("Failed to notify mentioned user:", targetUserId, err);
+                    }
+                }
+            }
+
             setNewGeneralComment("");
+            setGeneralMentionedUserIds([]);
         } catch (error) {
             console.error("Failed to save general comment:", error);
-            toast.error("Failed to send comment. Ensure the 'general_comments' table is created with attributes 'asset_id', 'user_id', 'user_email', and 'text'.");
+            toast.error("Failed to send comment. Ensure the 'general_comments' table is created with attributes 'asset_id', 'user_id', 'user_email', 'text', and 'mentions'.");
         } finally {
             setIsSubmittingGeneralComment(false);
         }
     };
+
+    const handleGeneralInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const value = e.target.value;
+        const cursorPosition = e.target.selectionStart || 0;
+        const textBeforeCursor = value.substring(0, cursorPosition);
+
+        const mentionMatch = textBeforeCursor.match(/(?:^|\s)@(\w*)$/);
+
+        if (mentionMatch) {
+            setShowGeneralMentions(true);
+            setGeneralMentionSearch(mentionMatch[1]);
+            setGeneralMentionIndex(textBeforeCursor.lastIndexOf('@'));
+        } else {
+            setShowGeneralMentions(false);
+        }
+
+        setNewGeneralComment(value);
+    };
+
+    const insertGeneralMention = (user: any) => {
+        const beforeMention = newGeneralComment.substring(0, generalMentionIndex);
+        const afterMention = newGeneralComment.substring(generalMentionIndex + generalMentionSearch.length + 1);
+        const updatedComment = `${beforeMention}@${user.username || user.name.split(' ')[0]} ${afterMention}`;
+        setNewGeneralComment(updatedComment);
+        setShowGeneralMentions(false);
+        if (!generalMentionedUserIds.includes(user.user_id)) {
+            setGeneralMentionedUserIds([...generalMentionedUserIds, user.user_id]);
+        }
+    };
+
+    const filteredGeneralCollaborators = collaborators.filter(c => {
+        const search = generalMentionSearch.toLowerCase();
+        const matchesUsername = c.username ? c.username.toLowerCase().includes(search) : false;
+        const matchesName = c.name ? c.name.toLowerCase().includes(search) : false;
+        return matchesUsername || matchesName;
+    });
+
+    const renderGeneralCommentText = (text: string) => {
+        const parts = text.split(/(@\w+)/g);
+        return parts.map((part, index) => {
+            if (part.startsWith('@')) {
+                const username = part.substring(1);
+                return (
+                    <Link
+                        key={index}
+                        href={`/dashboard/profile/${username}`}
+                        className="text-purple-400 hover:text-purple-300 hover:underline font-medium cursor-pointer"
+                    >
+                        {part}
+                    </Link>
+                );
+            }
+            return <React.Fragment key={index}>{part}</React.Fragment>;
+        });
+    };
+
 
     const handleStatusChange = async (newStatus: string) => {
         if (newStatus === 'rejected' || newStatus === 'changes_requested') {
@@ -527,7 +675,7 @@ export default function AssetDetailPage() {
             setIsFeedbackModalOpen(true);
             return;
         }
-        
+
         // Direct approval or other status
         await confirmStatusChange(newStatus, newStatus === 'approved' ? "Asset approved." : "");
     };
@@ -712,7 +860,7 @@ export default function AssetDetailPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 lg:gap-3">
-                        <button 
+                        <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleDownload(asset.file_path);
@@ -724,7 +872,7 @@ export default function AssetDetailPage() {
                         </button>
 
                         {(role === 'owner' || role === 'admin') && (
-                            <button 
+                            <button
                                 onClick={() => setIsUploadModalOpen(true)}
                                 className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-1.5 transition-colors font-medium text-xs"
                             >
@@ -795,6 +943,7 @@ export default function AssetDetailPage() {
                                     currentUserId={currentUserId}
                                     annotationOwnerId={ann.user_id}
                                     role={role}
+                                    collaborators={collaborators}
                                 />
                             )}
                         />
@@ -870,7 +1019,7 @@ export default function AssetDetailPage() {
                                                     {new Date(comment.created_at).toLocaleDateString()}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-slate-300 whitespace-pre-wrap ml-8">{comment.text}</p>
+                                            <p className="text-xs text-slate-300 whitespace-pre-wrap ml-8">{renderGeneralCommentText(comment.text)}</p>
                                         </div>
                                     ))
                                 )}
@@ -879,31 +1028,59 @@ export default function AssetDetailPage() {
                             {/* Input Box */}
                             {role !== 'viewer' && (
                                 <>
-                                    <div className="mt-auto shrink-0 relative bg-[#12131a] border border-[#2a2b36] rounded-xl focus-within:border-purple-500 transition-colors">
-                                        <textarea
-                                            value={newGeneralComment}
-                                            onChange={(e) => setNewGeneralComment(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && !e.shiftKey) {
-                                                    e.preventDefault();
-                                                    handleSendGeneralComment();
-                                                }
-                                            }}
-                                            placeholder="Write a general comment..."
-                                            className="w-full bg-transparent p-3 pr-10 text-sm text-white focus:outline-none resize-none placeholder-slate-600 custom-scrollbar block min-h-[80px]"
-                                            disabled={isSubmittingGeneralComment}
-                                        />
-                                        <button
-                                            onClick={handleSendGeneralComment}
-                                            disabled={!newGeneralComment.trim() || isSubmittingGeneralComment}
-                                            className="absolute bottom-2 right-2 p-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center"
-                                        >
-                                            {isSubmittingGeneralComment ? (
-                                                <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
-                                            ) : (
-                                                <Send className="w-4 h-4" />
-                                            )}
-                                        </button>
+                                    <div className="mt-auto shrink-0 relative">
+                                        {showGeneralMentions && (
+                                            <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#1a1b23] border border-[#2a2b36] rounded-xl shadow-2xl z-50 animate-in slide-in-from-bottom-2 duration-200 max-h-48 overflow-y-auto">
+                                                {filteredGeneralCollaborators.length > 0 ? (
+                                                    filteredGeneralCollaborators.map((collab) => (
+                                                        <button
+                                                            key={collab.user_id}
+                                                            type="button"
+                                                            onClick={() => insertGeneralMention(collab)}
+                                                            className="w-full flex items-center gap-3 p-3 hover:bg-purple-500/10 transition-colors text-left border-b border-[#2a2b36]/50 last:border-0"
+                                                        >
+                                                            <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                                                                <User className="w-4 h-4 text-purple-400" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs font-bold text-white truncate">{collab.name || 'User'}</p>
+                                                                <p className="text-[10px] text-slate-500 truncate">@{collab.username || collab.email?.split('@')[0] || 'user'}</p>
+                                                            </div>
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="p-3 text-xs text-slate-500 text-center">
+                                                        No matching users found.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        <div className="relative bg-[#12131a] border border-[#2a2b36] rounded-xl focus-within:border-purple-500 transition-colors">
+                                            <textarea
+                                                value={newGeneralComment}
+                                                onChange={handleGeneralInputChange}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handleSendGeneralComment();
+                                                    }
+                                                }}
+                                                placeholder="Write a general comment... (@mention)"
+                                                className="w-full bg-transparent p-3 pr-10 text-sm text-white focus:outline-none resize-none placeholder-slate-600 custom-scrollbar block min-h-[80px]"
+                                                disabled={isSubmittingGeneralComment}
+                                            />
+                                            <button
+                                                onClick={handleSendGeneralComment}
+                                                disabled={!newGeneralComment.trim() || isSubmittingGeneralComment}
+                                                className="absolute bottom-2 right-2 p-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center"
+                                            >
+                                                {isSubmittingGeneralComment ? (
+                                                    <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                                                ) : (
+                                                    <Send className="w-4 h-4" />
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="text-[10px] text-slate-500 mt-2 text-right">
                                         Press <span className="font-bold text-slate-400">Enter</span> to send
@@ -925,8 +1102,8 @@ export default function AssetDetailPage() {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="py-4">
-                        <Textarea 
-                            placeholder="Type your feedback here..." 
+                        <Textarea
+                            placeholder="Type your feedback here..."
                             value={feedbackText}
                             onChange={(e) => setFeedbackText(e.target.value)}
                             className="bg-[#0b0c10] border-[#1f202b] text-white placeholder:text-slate-600 focus:border-purple-500 focus:ring-purple-500"
@@ -934,7 +1111,7 @@ export default function AssetDetailPage() {
                     </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel className="bg-[#1e1f2b] border-[#2a2b36] hover:bg-[#2a2b36] hover:text-white text-slate-300">Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
+                        <AlertDialogAction
                             onClick={() => pendingStatus && confirmStatusChange(pendingStatus, feedbackText)}
                             disabled={!feedbackText.trim() || isLoading}
                             className={`${pendingStatus === 'rejected' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'} text-white font-bold px-6`}
@@ -963,14 +1140,14 @@ export default function AssetDetailPage() {
                             </button>
                         </div>
                         <div className="p-6">
-                            <AssetUpload 
-                                projectId={projectId} 
-                                assetGroupId={asset.asset_group_id} 
-                                currentVersion={parseInt(asset.version.replace('v', ''))} 
+                            <AssetUpload
+                                projectId={projectId}
+                                assetGroupId={asset.asset_group_id}
+                                currentVersion={parseInt(asset.version.replace('v', ''))}
                                 onUploadSuccess={() => {
                                     setIsUploadModalOpen(false);
                                     window.location.reload(); // Simplest way to refresh everything
-                                }} 
+                                }}
                             />
                         </div>
                     </div>

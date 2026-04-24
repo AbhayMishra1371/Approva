@@ -25,7 +25,7 @@ export type Comment = {
 interface CommentThreadProps {
     annotationId: string;
     comments: Comment[];
-    onAddComment: (text: string) => void;
+    onAddComment: (text: string, mentions?: string[]) => void;
     onClose: () => void;
     onResolve: () => void;
     onDelete: () => void;
@@ -36,6 +36,7 @@ interface CommentThreadProps {
     currentUserId?: string;
     annotationOwnerId?: string;
     role?: 'owner' | 'admin' | 'reviewer' | 'viewer' | null;
+    collaborators?: any[];
 }
 
 export const CommentThread: React.FC<CommentThreadProps> = ({
@@ -51,20 +52,62 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     readOnly = false,
     currentUserId,
     annotationOwnerId,
-    role
+    role,
+    collaborators = []
 }) => {
     const [newComment, setNewComment] = useState("");
+    const [mentionSearch, setMentionSearch] = useState("");
+    const [showMentions, setShowMentions] = useState(false);
+    const [mentionIndex, setMentionIndex] = useState(-1);
+    const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newComment.trim()) return;
-        onAddComment(newComment);
+        onAddComment(newComment, mentionedUserIds);
         setNewComment("");
+        setMentionedUserIds([]);
     };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        const cursorPosition = e.target.selectionStart || 0;
+        const textBeforeCursor = value.substring(0, cursorPosition);
+
+        const mentionMatch = textBeforeCursor.match(/(?:^|\s)@(\w*)$/);
+
+        if (mentionMatch) {
+            setShowMentions(true);
+            setMentionSearch(mentionMatch[1]);
+            setMentionIndex(textBeforeCursor.lastIndexOf('@'));
+        } else {
+            setShowMentions(false);
+        }
+
+        setNewComment(value);
+    };
+
+    const insertMention = (user: any) => {
+        const beforeMention = newComment.substring(0, mentionIndex);
+        const afterMention = newComment.substring(mentionIndex + mentionSearch.length + 1);
+        const updatedComment = `${beforeMention}@${user.username || user.name.split(' ')[0]} ${afterMention}`;
+        setNewComment(updatedComment);
+        setShowMentions(false);
+        if (!mentionedUserIds.includes(user.user_id)) {
+            setMentionedUserIds([...mentionedUserIds, user.user_id]);
+        }
+    };
+
+    const filteredCollaborators = collaborators.filter(c => {
+        const search = mentionSearch.toLowerCase();
+        const matchesUsername = c.username ? c.username.toLowerCase().includes(search) : false;
+        const matchesName = c.name ? c.name.toLowerCase().includes(search) : false;
+        return matchesUsername || matchesName;
+    });
 
     return (
         <div
-            className="flex flex-col bg-[#1e1f2b]/95 backdrop-blur-xl border border-[#2a2b36] w-80 max-h-[450px] rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            className="flex flex-col bg-[#1e1f2b]/95 backdrop-blur-xl border border-[#2a2b36] w-80 max-h-[450px] rounded-xl shadow-2xl animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
         >
@@ -172,14 +215,40 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
             </div>
 
             {!readOnly && (
-                <div className="p-4 border-t border-[#2a2b36]">
+                <div className="p-4 border-t border-[#2a2b36] relative">
+                    {showMentions && (
+                        <div className="absolute bottom-full left-4 right-4 mb-2 bg-[#1a1b23] border border-[#2a2b36] rounded-xl shadow-2xl z-50 animate-in slide-in-from-bottom-2 duration-200 max-h-48 overflow-y-auto">
+                            {filteredCollaborators.length > 0 ? (
+                                filteredCollaborators.map((collab) => (
+                                    <button
+                                        key={collab.user_id}
+                                        type="button"
+                                        onClick={() => insertMention(collab)}
+                                        className="w-full flex items-center gap-3 p-3 hover:bg-purple-500/10 transition-colors text-left border-b border-[#2a2b36]/50 last:border-0"
+                                    >
+                                        <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                                            <User className="w-4 h-4 text-purple-400" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-white truncate">{collab.name || 'User'}</p>
+                                            <p className="text-[10px] text-slate-500 truncate">@{collab.username || collab.email?.split('@')[0] || 'user'}</p>
+                                        </div>
+                                    </button>
+                                ))
+                            ) : (
+                                <div className="p-3 text-xs text-slate-500 text-center">
+                                    No matching users found.
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <form onSubmit={handleSubmit} className="relative">
                         <input
                             type="text"
-                            placeholder="Write a comment..."
+                            placeholder="Write a comment... (@mention)"
                             className="w-full bg-[#12131a] border border-[#2a2b36] rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 transition-colors"
                             value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
+                            onChange={handleInputChange}
                         />
                         <button
                             type="submit"

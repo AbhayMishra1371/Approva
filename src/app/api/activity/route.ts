@@ -18,7 +18,7 @@ export async function GET(request: Request) {
         const activityLogsCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs";
 
         if (!dbId || !projectsCollId || !collabsCollId) {
-             return NextResponse.json({ error: "Configuration missing" }, { status: 500 });
+            return NextResponse.json({ error: "Configuration missing" }, { status: 500 });
         }
 
         // 1. Fetch projects the user is a collaborator on
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
         // Fetch user names
         const uniqueUserIds = Array.from(new Set(logsRes.documents.filter(log => log.user_id).map(log => log.user_id)));
         const userMap: Record<string, string> = {};
-        
+
         await Promise.all(
             uniqueUserIds.map(async (uid: any) => {
                 try {
@@ -92,13 +92,13 @@ export async function GET(request: Request) {
 
     } catch (error: any) {
         console.error("Global Activity API Error:", error);
-        
+
         // Check for Appwrite missing index error (usually 400 or has specific message)
         if (error.code === 400 && error.message?.includes("index")) {
-             return NextResponse.json({ 
-                 error: "Missing index on 'project_id' in activity_logs collection. Please add it in Appwrite console.",
-                 code: "missing_index"
-             }, { status: 400 });
+            return NextResponse.json({
+                error: "Missing index on 'project_id' in activity_logs collection. Please add it in Appwrite console.",
+                code: "missing_index"
+            }, { status: 400 });
         }
 
         return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });

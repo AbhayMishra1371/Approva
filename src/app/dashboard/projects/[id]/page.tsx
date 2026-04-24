@@ -812,10 +812,15 @@ function CollaboratorsTab({ projectId, currentRole }: { projectId: string; curre
                                 <div key={c.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-[#252634] transition-colors">
                                     <div className="flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold shadow-md">
-                                            {(c.name || c.email) ? (c.name || c.email).charAt(0).toUpperCase() : <Users className="w-5 h-5" />}
+                                            {(() => {
+                                                const displayName = (c.name && c.name !== "Unknown User") ? c.name : (c.email || "Member");
+                                                return displayName.charAt(0).toUpperCase();
+                                            })()}
                                         </div>
                                         <div>
-                                            <p className="text-white font-medium text-sm">{c.name || c.email || "Unknown User"}</p>
+                                            <p className="text-white font-medium text-sm">
+                                                {(c.name && c.name !== "Unknown User") ? c.name : (c.email || "Member")}
+                                            </p>
                                             <p className="text-slate-500 text-xs mt-0.5">Joined {new Date(c.created_at).toLocaleDateString()}</p>
                                         </div>
                                     </div>

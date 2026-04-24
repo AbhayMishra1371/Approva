@@ -23,7 +23,7 @@ export async function GET(
         const collId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs";
 
         if (!dbId) {
-             return NextResponse.json({ error: "Database ID not configured" }, { status: 500 });
+            return NextResponse.json({ error: "Database ID not configured" }, { status: 500 });
         }
 
         const queries = [
