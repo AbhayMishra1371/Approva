@@ -22,7 +22,6 @@ import { toast } from "sonner";
 
 export default function ProfilePage() {
     const [user, setUser] = useState<any>(null);
-    const [profile, setProfile] = useState<any>(null);
     const [activities, setActivities] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditingName, setIsEditingName] = useState(false);
@@ -38,18 +37,6 @@ export default function ProfilePage() {
                     setUser(currentUser);
                     setNewName(currentUser.name);
 
-                    // Fetch profile document
-                    try {
-                        const { databases } = await import("@/lib/appwrite/client").then(m => m.createBrowserClient());
-                        const profileDoc = await databases.getDocument(
-                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                            "profile",
-                            currentUser.$id
-                        );
-                        setProfile(profileDoc);
-                    } catch (e) {
-                        console.error("Failed to fetch profile document", e);
-                    }
 
                     // Fetch user activity
                     const jwt = await getJwt();
@@ -225,7 +212,7 @@ export default function ProfilePage() {
                                 )}
                                 <p className="text-slate-400 text-sm flex items-center justify-center gap-2">
                                     <AtSign className="w-3.5 h-3.5 text-slate-500" />
-                                    {profile?.username || user.email.split('@')[0]}
+                                    {user.email.split('@')[0]}
                                 </p>
                                 <p className="text-slate-400 text-sm flex items-center justify-center gap-2">
                                     <Mail className="w-3.5 h-3.5 text-slate-500" />

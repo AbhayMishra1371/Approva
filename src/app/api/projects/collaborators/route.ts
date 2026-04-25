@@ -273,39 +273,18 @@ export async function GET(request: Request) {
       let avatarUrl = "";
 
       try {
-        const profile = await databases.getDocument(
-          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-          "profile",
-          doc.user_id
-        );
-        email = profile.email || email;
-        name = profile.full_name || name;
-        username = profile.username || (email.includes('@') ? email.split('@')[0] : "");
-        avatarUrl = profile.avatar_url || "";
-        
-        // If profile is incomplete, supplement with Auth data
-        if (name === "Unknown User" || !email || email.startsWith("User_")) {
-            try {
-                const targetUser = await users.get(doc.user_id);
-                if (!email || email.startsWith("User_")) email = targetUser.email;
-                if (name === "Unknown User") name = targetUser.name || targetUser.email.split('@')[0];
-                if (!username) username = targetUser.email.split('@')[0];
-            } catch (uErr) {}
-        }
+        const targetUser = await users.get(doc.user_id);
+        email = targetUser.email;
+        name = targetUser.name || targetUser.email.split('@')[0];
+        username = targetUser.email.split('@')[0];
+        avatarUrl = targetUser.prefs?.avatar_url || "";
       } catch (e) {
-        // Profile missing — get from Appwrite Auth users
-        try {
-            const targetUser = await users.get(doc.user_id);
-            email = targetUser.email;
-            name = targetUser.name || targetUser.email.split('@')[0];
-            username = targetUser.email.split('@')[0];
-        } catch (userErr) {
-            // Fallback for current user (might be faster)
-            if (doc.user_id === user.$id) {
-                email = user.email;
-                name = user.name || user.email.split('@')[0];
-                username = user.email.split('@')[0];
-            }
+        // Fallback for current user (might be faster)
+        if (doc.user_id === user.$id) {
+          email = user.email;
+          name = user.name || user.email.split('@')[0];
+          username = user.email.split('@')[0];
+          avatarUrl = user.prefs?.avatar_url || "";
         }
       }
 

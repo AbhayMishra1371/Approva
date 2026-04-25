@@ -654,13 +654,12 @@ export default function AssetDetailPage() {
             if (part.startsWith('@')) {
                 const username = part.substring(1);
                 return (
-                    <Link
+                    <span
                         key={index}
-                        href={`/dashboard/profile/${username}`}
-                        className="text-purple-400 hover:text-purple-300 hover:underline font-medium cursor-pointer"
+                        className="text-purple-400 font-medium"
                     >
                         {part}
-                    </Link>
+                    </span>
                 );
             }
             return <React.Fragment key={index}>{part}</React.Fragment>;
