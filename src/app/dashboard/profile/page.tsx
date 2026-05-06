@@ -20,9 +20,11 @@ import {
 import { getUser, updateName, getJwt } from "@/lib/auth/auth";
 import { toast } from "sonner";
 
+import { Activity } from "@/types";
+
 export default function ProfilePage() {
     const [user, setUser] = useState<any>(null);
-    const [activities, setActivities] = useState<any[]>([]);
+    const [activities, setActivities] = useState<Activity[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isEditingName, setIsEditingName] = useState(false);
     const [newName, setNewName] = useState("");

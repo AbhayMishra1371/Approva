@@ -30,18 +30,7 @@ import {
     AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-interface Project {
-    id: string;
-    name: string;
-    client_name: string;
-    deadline: string;
-    status: string;
-    owner_id: string;
-    created_at: string;
-    role?: string;
-    collaboratorCount?: number;
-    pendingCount?: number;
-};
+import { Project } from "@/types";
 
 export default function ProjectsPage() {
     const [projects, setProjects] = useState<Project[]>([]);
