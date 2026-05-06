@@ -398,7 +398,7 @@ export default function ProjectDetailPage() {
             <div className="flex-1 bg-[#12131a] border border-[#1f202b] rounded-xl flex flex-col md:flex-row overflow-hidden min-h-[600px] md:min-h-0">
                 {activeTab === "assets" && (
                     <>
-                        {/* Asset Grid Placeholder */}
+
                         {/* Asset Grid Placeholder */}
                         <div className="flex-1 p-4 md:p-6 flex flex-col min-w-0 overflow-y-auto">
                             <div className="flex items-center justify-between gap-2 sm:gap-4 mb-6">
@@ -431,8 +431,23 @@ export default function ProjectDetailPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                                     {assets.filter(a => a.status !== 'approved').map((asset) => (
                                         <div key={asset.id} className="bg-[#1a1c26] border border-[#2a2b36] rounded-xl overflow-hidden hover:border-purple-500/50 transition-colors group">
-                                            <div className="h-32 bg-[#12131a] flex items-center justify-center border-b border-[#2a2b36] relative">
-                                                {getFileIcon(asset.file_type)}
+                                            <div className="h-32 bg-[#12131a] border-b border-[#2a2b36] rounded-md relative overflow-hidden">
+                                                {asset.url && asset.file_type.startsWith("image/") ? (
+                                                    <img
+                                                        src={asset.url}
+                                                        alt={asset.file_name}
+                                                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                    />
+                                                ) : asset.url && asset.file_type.startsWith("video/") ? (
+                                                    <video
+                                                        src={asset.url}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center">
+                                                        {getFileIcon(asset.file_type)}
+                                                    </div>
+                                                )}
 
                                                 {/* Hover Actions */}
                                                 <div className="absolute inset-0 bg-[#12131a]/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
