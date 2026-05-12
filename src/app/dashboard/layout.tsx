@@ -13,7 +13,7 @@ import {
     User,
     LogOut,
 } from "lucide-react";
-import { NotificationBell } from "@/components/ui/NotificationBell";
+
 
 export default function DashboardLayout({
     children,
@@ -265,7 +265,7 @@ export default function DashboardLayout({
                         </div>
                     </div>
                     <div className="flex items-center gap-4">
-                        <NotificationBell />
+
                     </div>
                 </header>
 
@@ -278,7 +278,7 @@ export default function DashboardLayout({
                         <h1 className="font-bold text-lg text-white leading-tight truncate max-w-[120px]">Hello {userName}</h1>
                     </div>
                     <div className="flex items-center gap-2">
-                        <NotificationBell />
+
                         <button
                             onClick={() => setIsMobileMenuOpen(true)}
                             className="p-2 -mr-2 text-slate-400 hover:text-white"

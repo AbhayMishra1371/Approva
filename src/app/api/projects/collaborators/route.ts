@@ -162,38 +162,7 @@ export async function POST(request: Request) {
       console.log("Skipping email. Missing SMTP configuration.");
     }
 
-    /* Create Notification for the invited user if they exist */
-    try {
-      const { users: adminUsers } = await createAdminClient();
-      const userList = await adminUsers.list([Query.equal("email", email)]);
 
-      if (userList.total > 0) {
-        const targetUser = userList.users[0];
-        const notificationCollId = process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATION_COLLECTION_ID || "notification";
-
-        const doc = await databases.createDocument(
-          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-          notificationCollId,
-          ID.unique(),
-          {
-            user_id: targetUser.$id,
-            type: "invite",
-            title: "New Project Invitation",
-            message: `${user.email} invited you to collaborate on "${project.name}" as ${role}.`,
-            link: `/invite?token=${inviteToken}`,
-            is_read: false,
-            actor_id: user.$id,
-            project_id: projectId,
-            created_at: new Date().toISOString()
-          }
-        );
-        console.log("SUCCESS: Created notification for user:", targetUser.$id, "Doc ID:", doc.$id);
-      } else {
-        console.log("INFO: No user found for notification with email:", email);
-      }
-    } catch (notifErr) {
-      console.error("ERROR: Failed to create invite notification:", notifErr);
-    }
 
 
     return NextResponse.json({ ...invite, id: invite.$id });

@@ -377,32 +377,7 @@ export default function AssetDetailPage() {
                 console.error("Failed to log comment activity:", logError);
             }
 
-            // Create notifications for mentioned users
-            if (mentions && mentions.length > 0) {
-                for (const targetUserId of mentions) {
-                    if (targetUserId === user.$id) continue;
-                    try {
-                        await databases.createDocument(
-                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                            process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATION_COLLECTION_ID || "notification",
-                            ID.unique(),
-                            {
-                                user_id: targetUserId,
-                                type: "mention",
-                                title: "New Mention",
-                                message: `${user.name || user.email} mentioned you in an annotation comment on "${asset?.file_name}".`,
-                                link: `/dashboard/projects/${projectId}/assets/${assetId}`,
-                                is_read: false,
-                                actor_id: user.$id,
-                                project_id: projectId,
-                                asset_id: assetId
-                            }
-                        );
-                    } catch (err) {
-                        console.error("Failed to notify mentioned user:", targetUserId, err);
-                    }
-                }
-            }
+
         } catch (e) {
             console.error("Failed to save comment:", e);
             toast.error("Failed to save comment.");
@@ -451,30 +426,7 @@ export default function AssetDetailPage() {
                 console.error("Failed to log resolve activity:", logError);
             }
 
-            // Create Notification for the annotation author
-            try {
-                if (selectedAnnotation.user_id !== user.$id) {
-                    await databases.createDocument(
-                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                        process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATION_COLLECTION_ID || "notification",
-                        ID.unique(),
-                        {
-                            user_id: selectedAnnotation.user_id,
-                            type: "approval",
-                            title: "Annotation Approved",
-                            message: `${user.name || user.email} approved your annotation "${selectedAnnotation.name}" on ${asset?.file_name}.`,
-                            link: `/dashboard/projects/${projectId}/assets/${assetId}`,
-                            is_read: false,
-                            actor_id: user.$id,
-                            project_id: projectId,
-                            asset_id: assetId,
-                            created_at: new Date().toISOString()
-                        }
-                    );
-                }
-            } catch (notifErr) {
-                console.error("Failed to create annotation notification:", notifErr);
-            }
+
 
             setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
             setSelectedAnnotation(null);
@@ -575,32 +527,7 @@ export default function AssetDetailPage() {
                 mentions: generalMentionedUserIds
             } as any]);
 
-            // Create notifications for mentioned users
-            if (generalMentionedUserIds.length > 0) {
-                for (const targetUserId of generalMentionedUserIds) {
-                    if (targetUserId === user.$id) continue;
-                    try {
-                        await databases.createDocument(
-                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                            process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATION_COLLECTION_ID || "notification",
-                            ID.unique(),
-                            {
-                                user_id: targetUserId,
-                                type: "mention",
-                                title: "New Mention",
-                                message: `${user.name || user.email} mentioned you in a general comment on "${asset?.file_name}".`,
-                                link: `/dashboard/projects/${projectId}/assets/${assetId}`,
-                                is_read: false,
-                                actor_id: user.$id,
-                                project_id: projectId,
-                                asset_id: assetId
-                            }
-                        );
-                    } catch (err) {
-                        console.error("Failed to notify mentioned user:", targetUserId, err);
-                    }
-                }
-            }
+
 
             setNewGeneralComment("");
             setGeneralMentionedUserIds([]);

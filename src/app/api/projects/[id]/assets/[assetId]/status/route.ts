@@ -68,34 +68,6 @@ export async function POST(
         // 3. Update the Asset Document and optionally log it
         const updatedAsset = await updateAssetStatus(user, databases, projectId, assetId, status, comment);
 
-        /* Create Notification for the project owner */
-        try {
-            const notificationCollId = process.env.NEXT_PUBLIC_APPWRITE_NOTIFICATION_COLLECTION_ID || "notification";
-            
-            // Only notify if someone else made the change
-            if (project.owner_id !== user.$id) {
-                await databases.createDocument(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    notificationCollId,
-                    ID.unique(),
-                    {
-                        user_id: project.owner_id,
-                        type: "status_change",
-                        title: "Asset Status Updated",
-                        message: `${user.email} changed status of "${updatedAsset.file_name}" to ${status.replace('_', ' ')}.`,
-                        link: `/dashboard/projects/${projectId}/assets/${assetId}`,
-                        is_read: false,
-                        actor_id: user.$id,
-                        project_id: projectId,
-                        asset_id: assetId,
-                        created_at: new Date().toISOString()
-                    }
-                );
-            }
-        } catch (notifErr) {
-            console.error("Failed to create status notification:", notifErr);
-        }
-
         return NextResponse.json({ success: true, asset: { ...updatedAsset, id: updatedAsset.$id } });
 
     } catch (error: any) {
