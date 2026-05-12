@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser } from "@/lib/appwrite/server";
 import { ID, Query } from "node-appwrite";
-import { createAsset } from "@/modules/assets/assets.service";
+import { AssetController } from "@/modules/assets/asset.controller";
+import { AssetValidation } from "@/modules/assets/asset.validation";
 
 export const dynamic = "force-dynamic";
 
@@ -93,9 +94,15 @@ export async function POST(
 
         const json = await request.json();
 
+        const validation = AssetValidation.validateAssetData(json);
+        if (!validation.valid) {
+            return NextResponse.json({ error: "Validation Error", details: validation.errors }, { status: 400 });
+        }
+
         // Pass the request data to the new service
         // The service will handle versioning and thumbnail generation
-        const asset = await createAsset(user, databases, projectId, json);
+        const assetController = new AssetController(databases);
+        const asset = await assetController.createAsset(user, projectId, json);
 
         return NextResponse.json(asset);
     } catch (error: any) {

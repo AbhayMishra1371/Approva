@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
 import { Query, ID } from "node-appwrite";
-import { updateAssetStatus } from "@/modules/assets/assets.service";
+import { AssetController } from "@/modules/assets/asset.controller";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +66,8 @@ export async function POST(
         }
 
         // 3. Update the Asset Document and optionally log it
-        const updatedAsset = await updateAssetStatus(user, databases, projectId, assetId, status, comment);
+        const assetController = new AssetController(databases);
+        const updatedAsset = await assetController.updateAssetStatus(user, projectId, assetId, status, comment);
 
         return NextResponse.json({ success: true, asset: { ...updatedAsset, id: updatedAsset.$id } });
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
-import { getAllAssetsForUser } from "@/modules/assets/assets.service";
+import { AssetController } from "@/modules/assets/asset.controller";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +12,9 @@ export async function GET(request: Request) {
         }
 
         const { databases } = await createAdminClient();
+        const assetController = new AssetController(databases);
 
-        const formattedAssets = await getAllAssetsForUser(user, databases);
+        const formattedAssets = await assetController.getAllAssetsForUser(user);
 
         return NextResponse.json({ assets: formattedAssets });
     } catch (error: any) {
