@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
 import { Query, ID } from "node-appwrite";
+import { updateAssetStatus } from "@/modules/assets/assets.service";
 
 export const dynamic = "force-dynamic";
 
@@ -64,35 +65,8 @@ export async function POST(
             }
         }
 
-        // 3. Update the Asset Document
-        const updatedAsset = await databases.updateDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-            assetId,
-            {
-                status: status
-            }
-        );
-
-        // 4. Optionally create a general comment logging the change
-        if (comment) {
-            const generalCommentsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_GENERAL_COMMENTS_ID || 'general_comments';
-            try {
-                await databases.createDocument(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    generalCommentsCollectionId,
-                    ID.unique(),
-                    {
-                        asset_id: assetId,
-                        user_id: user.$id,
-                        user_email: user.email,
-                        text: comment
-                    }
-                );
-            } catch (cmtErr) {
-                console.warn("Failed to log status change as comment", cmtErr);
-            }
-        }
+        // 3. Update the Asset Document and optionally log it
+        const updatedAsset = await updateAssetStatus(user, databases, projectId, assetId, status, comment);
 
         /* Create Notification for the project owner */
         try {

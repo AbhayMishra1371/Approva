@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser } from "@/lib/appwrite/server";
 import { ID, Query } from "node-appwrite";
+import { createAsset } from "@/modules/assets/assets.service";
 
 export const dynamic = "force-dynamic";
 
@@ -91,29 +92,12 @@ export async function POST(
         }
 
         const json = await request.json();
-        const { fileName, filePath, fileType, size, url } = json;
 
-        if (!fileName || !filePath) {
-            return NextResponse.json({ error: "Missing required file information" }, { status: 400 });
-        }
+        // Pass the request data to the new service
+        // The service will handle versioning and thumbnail generation
+        const asset = await createAsset(user, databases, projectId, json);
 
-        const asset = await databases.createDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-            ID.unique(),
-            {
-                project_id: projectId,
-                file_name: fileName,
-                file_path: filePath,
-                file_type: fileType || 'unknown',
-                size: size || 0,
-                status: "draft",
-                version: "v1",
-                url: url || ""
-            }
-        );
-
-        return NextResponse.json({ ...asset, id: asset.$id });
+        return NextResponse.json(asset);
     } catch (error: any) {
         console.error("API Error [Create Asset]:", error?.message || error);
         return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
