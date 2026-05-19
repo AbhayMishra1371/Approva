@@ -1,41 +1,34 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { createBrowserClient } from "@/lib/appwrite/client";
-import { Models } from "appwrite";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 interface AuthContextType {
-  user: Models.User<Models.Preferences> | null;
+  user: User | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const { account, client } = createBrowserClient();
+    const supabase = createClient();
 
     // Fetch initial user
-    account.get()
-      .then((sessionUser) => {
-        setUser(sessionUser);
-      })
-      .catch(() => {
-        setUser(null);
-      });
-
-    // Realtime subscription for auth-related events
-    const unsubscribe = client.subscribe('account', response => {
-      if (response.events.includes('users.*.sessions.*.create') ||
-        response.events.includes('users.*.sessions.*.delete')) {
-        account.get()
-          .then((sessionUser) => setUser(sessionUser))
-          .catch(() => setUser(null));
-      }
+    supabase.auth.getUser().then(({ data: { user } }) => {
+        setUser(user);
     });
 
-    return () => unsubscribe();
+    // Realtime subscription for auth-related events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+    });
+
+    return () => {
+        subscription.unsubscribe();
+    };
   }, []);
 
   return (

@@ -1,11 +1,18 @@
-import { createBrowserClient } from "@/lib/appwrite/client";
-import { ID } from "appwrite";
+import { createClient } from "@/lib/supabase/client";
 
 export const signUp = async (email: string, password: string, name: string) => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        const user = await account.create(ID.unique(), email, password, name);
-        return { user, error: null };
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: name,
+                }
+            }
+        });
+        return { user: data.user, error };
     } catch (error: any) {
         console.error("SignUp Error:", error?.message || error);
         return { user: null, error };
@@ -13,11 +20,13 @@ export const signUp = async (email: string, password: string, name: string) => {
 };
 
 export const login = async (email: string, password: string) => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        const session = await account.createEmailPasswordSession(email, password);
-        const user = await account.get();
-        return { user, session, error: null };
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        return { user: data.user, session: data.session, error };
     } catch (error: any) {
         console.error("Login Error:", error?.message || error);
         return { user: null, session: null, error };
@@ -25,26 +34,21 @@ export const login = async (email: string, password: string) => {
 };
 
 export const getUser = async () => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        const user = await account.get();
+        const { data: { user } } = await supabase.auth.getUser();
         return user;
     } catch (error: any) {
-        if (error?.code !== 401 && !error?.message?.includes('missing scopes')) {
-            console.error("GetUser Error:", error?.message || error);
-        }
+        console.error("GetUser Error:", error?.message || error);
         return null;
     }
 };
 
 export const getJwt = async () => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        const user = await account.get().catch(() => null);
-        if (!user) return null;
-
-        const jwt = await account.createJWT();
-        return jwt.jwt;
+        const { data: { session } } = await supabase.auth.getSession();
+        return session?.access_token || null;
     } catch (error: any) {
         console.error("GetJWT Error:", error?.message || error);
         return null;
@@ -52,10 +56,12 @@ export const getJwt = async () => {
 };
 
 export const updateName = async (name: string) => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        await account.updateName(name);
-        return { success: true, error: null };
+        const { error } = await supabase.auth.updateUser({
+            data: { full_name: name }
+        });
+        return { success: !error, error };
     } catch (error: any) {
         console.error("UpdateName Error:", error?.message || error);
         return { success: false, error };
@@ -63,11 +69,15 @@ export const updateName = async (name: string) => {
 };
 
 export const updatePrefs = async (prefs: any) => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        const user = await account.get();
-        await account.updatePrefs({ ...user.prefs, ...prefs });
-        return { success: true, error: null };
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return { success: false, error: new Error("Not logged in") };
+        
+        const { error } = await supabase.auth.updateUser({
+            data: { prefs: { ...(user.user_metadata?.prefs || {}), ...prefs } }
+        });
+        return { success: !error, error };
     } catch (error: any) {
         console.error("UpdatePrefs Error:", error?.message || error);
         return { success: false, error };
@@ -75,13 +85,10 @@ export const updatePrefs = async (prefs: any) => {
 };
 
 export const logout = async () => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        await account.deleteSession("current");
+        await supabase.auth.signOut();
     } catch (error: any) {
-        // Ignore errors related to missing session/scopes (already logged out)
-        if (error?.code !== 401 && !error?.message?.includes('missing scopes')) {
-            console.error("Logout Error:", error?.message || error);
-        }
+        console.error("Logout Error:", error?.message || error);
     }
 };
