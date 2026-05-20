@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { createUserProfile } from "@/lib/supabase/profile";
 
 export const signUp = async (email: string, password: string, name: string) => {
     const supabase = createClient();
@@ -12,6 +13,9 @@ export const signUp = async (email: string, password: string, name: string) => {
                 }
             }
         });
+        if (data?.user) {
+            await createUserProfile();
+        }
         return { user: data.user, error };
     } catch (error: any) {
         console.error("SignUp Error:", error?.message || error);
@@ -26,6 +30,9 @@ export const login = async (email: string, password: string) => {
             email,
             password,
         });
+        if (data?.user) {
+            await createUserProfile();
+        }
         return { user: data.user, session: data.session, error };
     } catch (error: any) {
         console.error("Login Error:", error?.message || error);
