@@ -37,12 +37,12 @@ export default function ProfilePage() {
                 const currentUser = await getUser();
                 if (currentUser) {
                     setUser(currentUser);
-                    setNewName(currentUser.name);
+                    setNewName(currentUser.user_metadata?.full_name || "");
 
 
                     // Fetch user activity
                     const jwt = await getJwt();
-                    const res = await fetch(`/api/activity?userId=${currentUser.$id}`, {
+                    const res = await fetch(`/api/activity?userId=${currentUser.id}`, {
                         headers: { "Authorization": `Bearer ${jwt}` }
                     });
                     if (res.ok) {
@@ -64,7 +64,7 @@ export default function ProfilePage() {
         setIsUpdating(true);
         const { success, error } = await updateName(newName);
         if (success) {
-            setUser({ ...user, name: newName });
+            setUser({ ...user, user_metadata: { ...user.user_metadata, full_name: newName } });
             setIsEditingName(false);
             toast.success("Name updated successfully");
         } else {
@@ -144,10 +144,10 @@ export default function ProfilePage() {
 
     if (!user) return null;
 
-    const joinedDate = user.$createdAt ? formatDate(user.$createdAt) : "N/A";
-    const userRole = user?.prefs?.role || "Member";
-    const userAvatar = user?.prefs?.avatar_url || user?.prefs?.picture;
-    const userInitial = user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase();
+    const joinedDate = user.created_at ? formatDate(user.created_at) : "N/A";
+    const userRole = user?.user_metadata?.prefs?.role || "Member";
+    const userAvatar = user?.user_metadata?.prefs?.avatar_url || user?.user_metadata?.prefs?.picture;
+    const userInitial = user.user_metadata?.full_name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase();
 
     return (
         <div className="h-full flex flex-col overflow-hidden pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -167,7 +167,7 @@ export default function ProfilePage() {
                         <div className="relative mb-6">
                             <div className="w-28 h-28 rounded-full bg-[#1e1f2b] border-4 border-[#0b0c10] shadow-2xl flex items-center justify-center overflow-hidden">
                                 {userAvatar ? (
-                                    <img src={userAvatar} alt={user.name} className="w-full h-full object-cover" />
+                                    <img src={userAvatar} alt={user.user_metadata?.full_name || "User avatar"} className="w-full h-full object-cover" />
                                 ) : (
                                     <span className="text-4xl font-bold text-purple-400">{userInitial}</span>
                                 )}
@@ -202,7 +202,7 @@ export default function ProfilePage() {
                                     </div>
                                 ) : (
                                     <div className="flex items-center gap-2 justify-center">
-                                        <h2 className="text-2xl font-bold text-white tracking-tight">{user.name}</h2>
+                                        <h2 className="text-2xl font-bold text-white tracking-tight">{user.user_metadata?.full_name || "User"}</h2>
                                         <button
                                             onClick={() => setIsEditingName(true)}
                                             className="p-1 text-slate-500 hover:text-white transition-colors"
@@ -235,7 +235,7 @@ export default function ProfilePage() {
                                 </div>
                                 <div className="text-left min-w-0">
                                     <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest leading-none mb-1">Account ID</p>
-                                    <p className="text-xs text-slate-300 font-mono truncate">{user.$id}</p>
+                                    <p className="text-xs text-slate-300 font-mono truncate">{user.id}</p>
                                 </div>
                             </div>
 

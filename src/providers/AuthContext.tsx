@@ -17,7 +17,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = createClient();
 
     // Fetch initial user
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+        if (error && (error.message.includes("Refresh Token Not Found") || error.message.includes("refresh token") || error.message.includes("session missing"))) {
+            supabase.auth.signOut().catch(() => {});
+        }
         setUser(user);
     });
 

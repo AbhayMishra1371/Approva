@@ -36,9 +36,21 @@ export const login = async (email: string, password: string) => {
 export const getUser = async () => {
     const supabase = createClient();
     try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) {
+            if (error.message.includes("Refresh Token Not Found") || error.message.includes("refresh token") || error.message.includes("session missing")) {
+                await supabase.auth.signOut().catch(() => {});
+            } else {
+                console.error("GetUser API Error:", error.message);
+            }
+            return null;
+        }
         return user;
     } catch (error: any) {
+        if (error?.name === "AuthApiError" && error?.message?.includes("Refresh Token Not Found")) {
+            await supabase.auth.signOut().catch(() => {});
+            return null;
+        }
         console.error("GetUser Error:", error?.message || error);
         return null;
     }
@@ -47,9 +59,21 @@ export const getUser = async () => {
 export const getJwt = async () => {
     const supabase = createClient();
     try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+            if (error.message.includes("Refresh Token Not Found") || error.message.includes("refresh token") || error.message.includes("session missing")) {
+                await supabase.auth.signOut().catch(() => {});
+            } else {
+                console.error("GetJWT API Error:", error.message);
+            }
+            return null;
+        }
         return session?.access_token || null;
     } catch (error: any) {
+        if (error?.name === "AuthApiError" && error?.message?.includes("Refresh Token Not Found")) {
+            await supabase.auth.signOut().catch(() => {});
+            return null;
+        }
         console.error("GetJWT Error:", error?.message || error);
         return null;
     }
@@ -71,8 +95,8 @@ export const updateName = async (name: string) => {
 export const updatePrefs = async (prefs: any) => {
     const supabase = createClient();
     try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return { success: false, error: new Error("Not logged in") };
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) return { success: false, error: authError || new Error("Not logged in") };
         
         const { error } = await supabase.auth.updateUser({
             data: { prefs: { ...(user.user_metadata?.prefs || {}), ...prefs } }
