@@ -3,9 +3,9 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { UploadCloud, File, X, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
-import { ID, Permission, Role, Query } from "appwrite";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@/lib/appwrite/client";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
+import { v4 as uuidv4 } from "uuid";
 
 interface AssetUploadProps {
     projectId: string;
@@ -45,105 +45,65 @@ export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle, assetGro
                 setProgress(p => Math.min(p + 10, 90));
             }, 500);
 
-            // 2. Upload to Appwrite Storage
+            // 2. Upload to Supabase Storage
             const fileExt = file.name.split('.').pop() || 'unknown';
             const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
 
-            // Appwrite Storage expects standard File object, not a custom path like Supabase
-            // We store the original file name and let Appwrite generate the ID
+            const supabase = createSupabaseClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("No authenticated user session found");
 
-            const { account, storage, databases } = createBrowserClient();
-            const user = await account.get();
+            const { data: storageData, error: uploadError } = await supabase.storage
+                .from("assets")
+                .upload(fileName, file);
 
-            const storageData = await storage.createFile(
-                process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
-                ID.unique(),
-                file
-            );
+            if (uploadError) throw uploadError;
 
             clearInterval(progressInterval);
-
             setProgress(95);
 
-            // Get the public URL for the file (Appwrite)
-            const publicUrl = storage.getFileView(
-                process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
-                storageData.$id
-            ).toString();
+            // Get the public URL for the file (Supabase)
+            const { data: { publicUrl } } = supabase.storage
+                .from("assets")
+                .getPublicUrl(fileName);
 
             // 3. Save metadata to Database
             const isNewVersion = !!assetGroupId;
-            const groupId = assetGroupId || ID.unique();
+            const groupId = assetGroupId || uuidv4();
             const newVersionNumber = isNewVersion ? (currentVersion || 1) + 1 : 1;
 
             if (isNewVersion) {
-                // Find and update current latest version to not be latest
                 try {
-                    const latestDocs = await databases.listDocuments(
-                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                        process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-                        [
-                            Query.equal("asset_group_id", assetGroupId),
-                            Query.equal("is_latest", true)
-                        ]
-                    );
+                    const { error: updateError } = await supabase
+                        .from("assets")
+                        .update({ is_latest: false })
+                        .eq("asset_group_id", assetGroupId)
+                        .eq("is_latest", true);
 
-                    for (const doc of latestDocs.documents) {
-                        await databases.updateDocument(
-                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-                            doc.$id,
-                            { is_latest: false }
-                        );
-                    }
+                    if (updateError) throw updateError;
                 } catch (e) {
                     console.error("Failed to update previous version latest status:", e);
                 }
             }
 
-            const assetDoc = await databases.createDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-                ID.unique(),
-                {
-                    project_id: projectId,
+            const { data: assetDoc, error: dbError } = await supabase
+                .from("assets")
+                .insert({
+                    project_id: projectId, // UUID with hyphens
                     file_name: file.name,
-                    file_path: storageData.$id,
+                    file_path: fileName,
                     file_type: file.type,
-                    size: file.size,
+                    file_size: file.size,
                     url: publicUrl,
                     version: `v${newVersionNumber}`,
                     status: "Pending",
                     asset_group_id: groupId,
                     is_latest: true
-                }
-            );
+                })
+                .select()
+                .single();
 
-            // 4. Create Activity Log
-            const action = isNewVersion ? "uploaded_new_version" : "uploaded_asset";
-            const metadata = isNewVersion
-                ? { file_name: file.name, version: newVersionNumber }
-                : { file_name: file.name };
-
-            await databases.createDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
-                ID.unique(),
-                {
-                    project_id: projectId,
-                    user_id: user.$id,
-                    user_email: user.email,
-                    action: action,
-                    entity_type: "asset",
-                    entity_id: assetDoc.$id,
-                    metadata: JSON.stringify(metadata)
-                },
-                [
-                    Permission.read(Role.users()),
-                    Permission.update(Role.user(user.$id)),
-                    Permission.delete(Role.user(user.$id))
-                ]
-            );
+            if (dbError) throw dbError;
 
             setProgress(100);
             setSuccess(true);
@@ -161,8 +121,12 @@ export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle, assetGro
             }, 3000);
 
         } catch (err: any) {
-            console.error("Asset Upload Error:", err instanceof Error ? err.message : err);
-            setError(err.message || "An unexpected error occurred.");
+            console.error("Asset Upload Error Details:", err);
+            let message = "An unexpected error occurred.";
+            if (err) {
+                message = err.message || err.error_description || err.error || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+            }
+            setError(message);
             setProgress(0);
         } finally {
             setUploading(false);

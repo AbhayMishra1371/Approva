@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 import { ID, Query } from "node-appwrite";
 import nodemailer from "nodemailer";
 import { render } from "@react-email/render";
@@ -88,11 +89,16 @@ export async function POST(request: Request) {
     }
 
     /* Fetch project details for email */
-    const project = await databases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-      projectId
-    );
+    const supabase = await createSupabaseServerClient();
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .select("name")
+      .eq("id", projectId)
+      .single();
+
+    if (projectError || !project) {
+      return NextResponse.json({ error: "Project not found in Supabase" }, { status: 404 });
+    }
 
     /* Create invite in DB */
     const inviteToken = uuidv4();
@@ -205,14 +211,15 @@ export async function GET(request: Request) {
     let callerRole = "";
 
     if (!existingAccess) {
-      // Check if the caller is the actual project creator
-      const project = await databases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-        projectId
-      );
+      // Check if the caller is the actual project creator in Supabase
+      const supabase = await createSupabaseServerClient();
+      const { data: project } = await supabase
+        .from("projects")
+        .select("owner_id")
+        .eq("id", projectId)
+        .single();
 
-      if (project.owner_id === user.$id) {
+      if (project && project.owner_id === user.$id) {
         // Assume project creator → seed as owner
         await databases.createDocument(
           process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,

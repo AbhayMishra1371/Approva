@@ -56,9 +56,36 @@ export async function createAdminClient() {
 export async function getLoggedInUser() {
     try {
         const supabase = await createSupabaseServerClient();
-        const { data: { user: supabaseUser } } = await supabase.auth.getUser();
+        let supabaseUser = null;
+
+        // Try getting user from session cookies first
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            supabaseUser = user;
+        } catch (e) {
+            console.warn("Session cookies retrieval failed:", e);
+        }
         
-        if (!supabaseUser) throw new Error("No user");
+        // Fallback: check Authorization Bearer header
+        if (!supabaseUser) {
+            try {
+                const requestHeaders = await headers();
+                const authHeader = requestHeaders.get('authorization');
+                if (authHeader && authHeader.startsWith('Bearer ')) {
+                    const token = authHeader.split(' ')[1];
+                    const { data: { user: userFromToken }, error: tokenErr } = await supabase.auth.getUser(token);
+                    if (tokenErr) {
+                        console.warn("Token verification error:", tokenErr.message);
+                    } else {
+                        supabaseUser = userFromToken;
+                    }
+                }
+            } catch (headerErr) {
+                console.warn("Bearer token retrieval failed:", headerErr);
+            }
+        }
+        
+        if (!supabaseUser) throw new Error("No user found in cookies or Bearer token");
 
         const user = {
             $id: supabaseUser.id,
@@ -70,6 +97,7 @@ export async function getLoggedInUser() {
         const { databases, storage } = await createAdminClient();
         return { user, databases, storage };
     } catch (error) {
+        console.warn("getLoggedInUser auth failed:", error instanceof Error ? error.message : error);
         return { user: null, databases: null, storage: null };
     }
 }

@@ -21,6 +21,7 @@ import {
 import { AssetUpload } from "@/components/projects/AssetUpload";
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query, ID, Permission, Role } from "appwrite";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { AnnotationCanvas, Annotation } from "@/components/projects/AnnotationCanvas";
 
@@ -127,13 +128,17 @@ export default function AssetDetailPage() {
                 setUserEmail(user.email);
                 setCurrentUserId(user.$id);
 
+                const supabase = createSupabaseClient();
+
                 // Fetch Asset
-                const assetDoc = await databases.getDocument(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-                    assetId
-                );
-                setAsset({ ...assetDoc as any, id: assetDoc.$id });
+                const { data: assetDoc, error: assetErr } = await supabase
+                    .from("assets")
+                    .select("*")
+                    .eq("id", assetId)
+                    .single();
+
+                if (assetErr) throw assetErr;
+                setAsset({ ...assetDoc, size: assetDoc.file_size });
 
                 // Fetch Annotations
                 try {
@@ -181,15 +186,14 @@ export default function AssetDetailPage() {
                 // Fetch Versions if they exist
                 if (assetDoc.asset_group_id) {
                     try {
-                        const versionDocs = await databases.listDocuments(
-                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-                            [
-                                Query.equal("asset_group_id", assetDoc.asset_group_id),
-                                Query.orderDesc("version")
-                            ]
-                        );
-                        setVersions(versionDocs.documents.map(doc => ({ ...doc as any, id: doc.$id })));
+                        const { data: versionDocs, error: versionErr } = await supabase
+                            .from("assets")
+                            .select("*")
+                            .eq("asset_group_id", assetDoc.asset_group_id)
+                            .order("version", { ascending: false });
+
+                        if (versionErr) throw versionErr;
+                        setVersions((versionDocs || []).map((doc: any) => ({ ...doc, id: doc.id, size: doc.file_size })));
                     } catch (e) {
                         console.error("Error fetching versions:", e);
                     }
@@ -678,20 +682,22 @@ export default function AssetDetailPage() {
     };
 
 
-    const handleDownload = (filePath: string) => {
+     const handleDownload = async (filePath: string) => {
         try {
-            const { storage } = createBrowserClient();
-            const downloadUrl = storage.getFileDownload(
-                process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
-                filePath
-            ).toString();
+            const supabase = createSupabaseClient();
+            const { data, error } = await supabase.storage
+                .from("assets")
+                .download(filePath);
 
+            if (error) throw error;
+
+            const url = window.URL.createObjectURL(data);
             const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.style.display = 'none';
+            link.href = url;
+            link.setAttribute('download', asset?.file_name || 'download');
             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
+            link.remove();
         } catch (error) {
             console.error("Download error:", error);
             toast.error("Failed to start download.");

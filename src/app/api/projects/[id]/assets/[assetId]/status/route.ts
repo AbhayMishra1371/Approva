@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 import { Query, ID } from "node-appwrite";
 import { AssetController } from "@/modules/assets/asset.controller";
 
@@ -39,14 +40,15 @@ export async function POST(
         );
 
         let role = "viewer";
-        // Also check if caller is the owner
-        const project = await databases.getDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-            projectId
-        );
+        // Also check if caller is the owner in Supabase
+        const supabase = await createSupabaseServerClient();
+        const { data: project } = await supabase
+            .from("projects")
+            .select("owner_id")
+            .eq("id", projectId)
+            .single();
 
-        if (project.owner_id === user.$id) {
+        if (project && project.owner_id === user.$id) {
             role = "owner";
         } else if (callerAccess.total > 0) {
             role = callerAccess.documents[0].role;

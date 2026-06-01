@@ -82,33 +82,8 @@ export async function POST(request: Request) {
             ]
         );
 
-        // 4. Update the Project Document to grant this user read access
-        try {
-            // First fetch the project to get current explicit permissions
-            const project = await adminDatabases.getDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-                inviteObj.project_id
-            );
-
-            const newPermissions = [
-                ...(project.$permissions || []),
-                Permission.read(Role.user(user.$id))
-            ];
-
-            // Use an empty object for data since we only want to update permissions
-            await adminDatabases.updateDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-                inviteObj.project_id,
-                {}, // Only mutating permissions
-                newPermissions
-            );
-            console.log("Successfully granted project permissions to user");
-
-        } catch (permError) {
-            console.error("Failed to update project permissions:", permError);
-        }
+        // 4. Update the Project Document permissions (skipped because projects are in Supabase)
+        console.log("Projects are managed in Supabase; skipping Appwrite project permission update.");
 
         // 4. Delete the pending invite now that it was successfully consumed
         await adminDatabases.deleteDocument(

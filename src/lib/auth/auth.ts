@@ -92,6 +92,12 @@ export const updateName = async (name: string) => {
         const { error } = await supabase.auth.updateUser({
             data: { full_name: name }
         });
+        if (!error) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase.from("profiles").update({ name }).eq("id", user.id);
+            }
+        }
         return { success: !error, error };
     } catch (error: any) {
         console.error("UpdateName Error:", error?.message || error);
@@ -121,5 +127,33 @@ export const logout = async () => {
         await supabase.auth.signOut();
     } catch (error: any) {
         console.error("Logout Error:", error?.message || error);
+    }
+};
+
+export const getUserAvatar = async () => {
+    try {
+        const supabase = createClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error || !user) {
+            return null;
+        }
+
+        // Check if user logged in via Google
+        const googleIdentity = user.identities?.find((identity) => identity.provider === "google");
+        
+        if (googleIdentity && user.user_metadata?.picture) {
+            // Return Google avatar URL from metadata
+            return user.user_metadata.picture;
+        }
+
+        // Generate avatar from user's initial letter
+        const userName = user.user_metadata?.full_name || user.email || "User";
+        const initialLetter = userName.charAt(0).toUpperCase();
+        
+        return initialLetter;
+    } catch (error: any) {
+        console.error("GetUserAvatar Error:", error?.message || error);
+        return null;
     }
 };

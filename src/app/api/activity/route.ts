@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 import { Query } from "node-appwrite";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +14,10 @@ export async function GET(request: Request) {
 
         const { databases, users } = await createAdminClient();
         const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-        const projectsCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!;
         const collabsCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!;
         const activityLogsCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs";
 
-        if (!dbId || !projectsCollId || !collabsCollId) {
+        if (!dbId || !collabsCollId) {
             return NextResponse.json({ error: "Configuration missing" }, { status: 500 });
         }
 
@@ -36,15 +36,17 @@ export async function GET(request: Request) {
             return NextResponse.json({ documents: [] }, { status: 200 });
         }
 
-        // 2. Fetch project names for these IDs (limit 100)
-        const projectsRes = await databases.listDocuments(
-            dbId,
-            projectsCollId,
-            [Query.equal("$id", projectIds), Query.limit(100)]
-        );
+        // 2. Fetch project names for these IDs from Supabase
+        const supabase = await createSupabaseServerClient();
+        const { data: projectsRes, error: projErr } = await supabase
+            .from("projects")
+            .select("id, name")
+            .in("id", projectIds);
 
-        const projectMap = projectsRes.documents.reduce((acc: any, p: any) => {
-            acc[p.$id] = p.name;
+        if (projErr) throw projErr;
+
+        const projectMap = (projectsRes || []).reduce((acc: any, p: any) => {
+            acc[p.id] = p.name;
             return acc;
         }, {});
 

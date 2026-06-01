@@ -3,6 +3,7 @@ import { getLoggedInUser } from "@/lib/appwrite/server";
 import { ID, Query } from "node-appwrite";
 import { AssetController } from "@/modules/assets/asset.controller";
 import { AssetValidation } from "@/modules/assets/asset.validation";
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -35,17 +36,17 @@ export async function GET(
             return NextResponse.json({ error: "Unauthorized access to this project" }, { status: 403 });
         }
 
-        const assetsResponse = await databases.listDocuments(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-            [
-                Query.equal("project_id", projectId),
-                Query.orderDesc("$createdAt")
-            ]
-        );
+        const supabase = await createSupabaseServerClient();
+        const { data: assetsData, error: assetsErr } = await supabase
+            .from("assets")
+            .select("*")
+            .eq("project_id", projectId)
+            .order("created_at", { ascending: false });
+
+        if (assetsErr) throw assetsErr;
 
         // Map Appwrite documents to replace $id with id for frontend
-        const assets = assetsResponse.documents.map((doc: any) => ({ ...doc, id: doc.$id }));
+        const assets = (assetsData || []).map((doc: any) => ({ ...doc, id: doc.id, size: doc.file_size }));
 
         return NextResponse.json(assets);
     } catch (error: any) {
@@ -153,31 +154,36 @@ export async function DELETE(
             return NextResponse.json({ error: "Insufficient permissions to delete this asset" }, { status: 403 });
         }
 
-        // Get asset details to find file_path
-        const assetObj = await databases.getDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-            assetId
-        );
+        const supabase = await createSupabaseServerClient();
 
-        // Delete from Appwrite Storage
-        if (assetObj.file_path) {
+        // Get asset details to find file_path
+        const { data: assetObj, error: fetchErr } = await supabase
+            .from("assets")
+            .select("file_path")
+            .eq("id", assetId)
+            .single();
+
+        if (fetchErr) throw fetchErr;
+
+        // Delete from Supabase Storage
+        if (assetObj?.file_path) {
             try {
-                await storage.deleteFile(
-                    process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
-                    assetObj.file_path
-                );
+                const { error: storageErr } = await supabase.storage
+                    .from("assets")
+                    .remove([assetObj.file_path]);
+                if (storageErr) throw storageErr;
             } catch (storageError: any) {
                 console.error("Storage delete error:", storageError?.message || storageError);
             }
         }
 
-        // Delete from Appwrite Database
-        await databases.deleteDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-            assetId
-        );
+        // Delete from Supabase Database
+        const { error: deleteErr } = await supabase
+            .from("assets")
+            .delete()
+            .eq("id", assetId);
+
+        if (deleteErr) throw deleteErr;
 
         return NextResponse.json({ success: true });
     } catch (error: any) {
