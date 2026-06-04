@@ -15,7 +15,7 @@ import {
     X,
     Loader2
 } from "lucide-react";
-import { createBrowserClient } from "@/lib/appwrite/client";
+import { getJwt } from "@/lib/auth/auth";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { Query, ID, Permission, Role } from "appwrite";
 import { toast } from "sonner";
@@ -44,8 +44,7 @@ export default function ProjectsPage() {
 
     const fetchProjects = async () => {
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
             const res = await fetch("/api/projects", {
                 headers: { "Authorization": `Bearer ${jwt}` }
             });
@@ -66,8 +65,7 @@ export default function ProjectsPage() {
 
     const handleDeleteProject = async (projectId: string) => {
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
 
             const res = await fetch(`/api/projects/${projectId}`, {
                 method: "DELETE",
@@ -270,8 +268,7 @@ function CreateProjectModal({
         };
 
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
 
             const res = await fetch("/api/projects", {
                 method: "POST",

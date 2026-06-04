@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
-import { Query } from "node-appwrite";
+import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,32 +10,41 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { databases, users } = await createAdminClient();
-        const dbId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-        const collabsCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!;
-        const activityLogsCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs";
+        const supabase = await createSupabaseServerClient();
 
-        if (!dbId || !collabsCollId) {
-            return NextResponse.json({ error: "Configuration missing" }, { status: 500 });
-        }
-
-        // 1. Fetch projects the user is a collaborator on
+        // 1. Fetch projects the user has access to (owned + collaborated) from Supabase
         const url = new URL(request.url);
         const filterUserId = url.searchParams.get("userId");
 
-        const collabsRes = await databases.listDocuments(
-            dbId,
-            collabsCollId,
-            [Query.equal("user_id", user.$id)]
-        );
+        let ownedIds: string[] = [];
+        try {
+            const { data: ownedProjects } = await supabase
+                .from("projects")
+                .select("id")
+                .eq("owner_id", user.$id);
+            ownedIds = (ownedProjects || []).map(p => p.id);
+        } catch (e) {
+            console.warn("Could not query owned projects from Supabase for activity:", e);
+        }
 
-        const projectIds = collabsRes.documents.map((doc: any) => doc.project_id);
+        let collabIds: string[] = [];
+        try {
+            const { data: collabs, error: collabsErr } = await supabase
+                .from("project_collaborators")
+                .select("project_id")
+                .eq("user_id", user.$id);
+            if (collabsErr) throw collabsErr;
+            collabIds = (collabs || []).map((c: any) => c.project_id);
+        } catch (e) {
+            console.warn("Could not query collaborator projects from Supabase for activity:", e);
+        }
+
+        const projectIds = Array.from(new Set([...ownedIds, ...collabIds]));
         if (projectIds.length === 0) {
             return NextResponse.json({ documents: [] }, { status: 200 });
         }
 
         // 2. Fetch project names for these IDs from Supabase
-        const supabase = await createSupabaseServerClient();
         const { data: projectsRes, error: projErr } = await supabase
             .from("projects")
             .select("id, name")
@@ -50,59 +57,40 @@ export async function GET(request: Request) {
             return acc;
         }, {});
 
-        // 3. Fetch activity logs for these projects (with optional user filter)
-        const queries = [
-            Query.equal("project_id", projectIds),
-            Query.orderDesc("$createdAt"),
-            Query.limit(100)
-        ];
+        // 3. Fetch activity logs for these projects (with optional user filter) from Supabase
+        let queryBuilder = supabase
+            .from("activity_logs")
+            .select(`
+                *,
+                profiles (name, email)
+            `)
+            .in("project_id", projectIds)
+            .order("created_at", { ascending: false })
+            .limit(100);
 
         if (filterUserId) {
-            queries.push(Query.equal("user_id", filterUserId));
+            queryBuilder = queryBuilder.eq("user_id", filterUserId);
         }
 
-        const logsRes = await databases.listDocuments(
-            dbId,
-            activityLogsCollId,
-            queries
-        );
+        const { data: logsRes, error: logsErr } = await queryBuilder;
+        if (logsErr) throw logsErr;
 
-        // Fetch user names
-        const uniqueUserIds = Array.from(new Set(logsRes.documents.filter(log => log.user_id).map(log => log.user_id)));
-        const userMap: Record<string, string> = {};
-
-        await Promise.all(
-            uniqueUserIds.map(async (uid: any) => {
-                try {
-                    const u = await users.get(uid);
-                    userMap[uid] = u.name || u.email || 'Unknown User';
-                } catch (e) {
-                    console.warn(`Could not fetch user ${uid}`, e);
-                    userMap[uid] = 'Unknown User';
-                }
-            })
-        );
-
-        // 4. Attach project names and user names to logs
-        const enhancedLogs = logsRes.documents.map((log: any) => ({
-            ...log,
-            project_name: projectMap[log.project_id] || "Unknown Project",
-            user_name: userMap[log.user_id] || log.user_email || log.user_id
-        }));
+        // 4. Attach project names and user names to logs, formatting for frontend compatibility
+        const enhancedLogs = (logsRes || []).map((log: any) => {
+            const profile = log.profiles || {};
+            return {
+                ...log,
+                $id: log.id,
+                $createdAt: log.created_at,
+                project_name: projectMap[log.project_id] || "Unknown Project",
+                user_name: profile.name || log.user_email || "Unknown User"
+            };
+        });
 
         return NextResponse.json({ documents: enhancedLogs }, { status: 200 });
 
     } catch (error: any) {
         console.error("Global Activity API Error:", error);
-
-        // Check for Appwrite missing index error (usually 400 or has specific message)
-        if (error.code === 400 && error.message?.includes("index")) {
-            return NextResponse.json({
-                error: "Missing index on 'project_id' in activity_logs collection. Please add it in Appwrite console.",
-                code: "missing_index"
-            }, { status: 400 });
-        }
-
         return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });
     }
 }

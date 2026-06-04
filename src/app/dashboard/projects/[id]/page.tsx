@@ -142,8 +142,7 @@ export default function ProjectDetailPage() {
 
     const handleDeleteProject = async (projectId: string) => {
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
 
             const res = await fetch(`/api/projects/${projectId}`, {
                 method: "DELETE",
@@ -204,8 +203,7 @@ export default function ProjectDetailPage() {
         if (!inviteEmail) return;
         setIsInviting(true);
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
             const res = await fetch("/api/projects/collaborators", {
                 method: "POST",
                 headers: {
@@ -228,27 +226,21 @@ export default function ProjectDetailPage() {
 
                 // Create Activity Log
                 try {
-                    const { databases, account } = createBrowserClient();
-                    const user = await account.get();
-                    await databases.createDocument(
-                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                        process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
-                        ID.unique(),
-                        {
-                            project_id: id,
-                            user_id: user.$id,
-                            user_email: user.email,
-                            action: "invited_user",
-                            entity_type: "invite",
-                            entity_id: id, // Linking to project as invite doesn't have a specific ID here
-                            metadata: JSON.stringify({ invited_email: invitedEmail })
-                        },
-                        [
-                            Permission.read(Role.users()),
-                            Permission.update(Role.user(user.$id)),
-                            Permission.delete(Role.user(user.$id))
-                        ]
-                    );
+                    const supabase = createSupabaseClient();
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                        await supabase
+                            .from("activity_logs")
+                            .insert({
+                                project_id: id,
+                                user_id: user.id,
+                                user_email: user.email || "",
+                                action: "invited_user",
+                                entity_type: "invite",
+                                entity_id: id,
+                                metadata: JSON.stringify({ invited_email: invitedEmail })
+                            });
+                    }
                 } catch (logError) {
                     console.error("Failed to log invite activity:", logError);
                 }

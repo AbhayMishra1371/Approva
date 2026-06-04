@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
+import { getLoggedInUser } from "@/lib/supabase/server";
 import { AssetController } from "@/modules/assets/asset.controller";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +11,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { databases } = await createAdminClient();
-        const assetController = new AssetController(databases);
+        const assetController = new AssetController(null);
 
         const formattedAssets = await assetController.getAllAssetsForUser(user);
 

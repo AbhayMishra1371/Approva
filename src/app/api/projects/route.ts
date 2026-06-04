@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
+import { getLoggedInUser } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/appwrite/server";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 import { Query, ID, Permission, Role } from "node-appwrite";
 
@@ -38,47 +39,24 @@ export async function GET(request: Request) {
 
         const ownedIds = new Set(ownedProjects.map(p => p.id));
 
-        // 2. Fetch collaborator links safely.
+        // 2. Fetch collaborator links safely from Supabase
         let collabProjectIds: string[] = [];
         let collabRoles: Record<string, string> = {};
 
         try {
-            const collabsRes = await databases.listDocuments(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-                [Query.equal("user_id", user.$id)]
-            );
+            const { data: collabs, error: collabsErr } = await supabase
+                .from("project_collaborators")
+                .select("project_id, role")
+                .eq("user_id", user.$id);
 
-            // SECURITY: Manual secondary filter to ensure user_id matches
-            const filteredCollabs = collabsRes.documents.filter((doc: any) => doc.user_id === user.$id);
+            if (collabsErr) throw collabsErr;
 
-            if (filteredCollabs.length !== collabsRes.documents.length) {
-                console.warn(`[SECURITY ALERT] Collaborator query returned ${collabsRes.documents.length} docs, but only ${filteredCollabs.length} matched user_id ${user.$id}. LEAK PREVENTED.`);
-            }
-
-            filteredCollabs.forEach((doc: any) => {
+            (collabs || []).forEach((doc: any) => {
                 collabProjectIds.push(doc.project_id);
-                collabRoles[doc.project_id] = doc.role;
+                collabRoles[doc.project_id] = doc.role === 'member' ? 'viewer' : doc.role;
             });
         } catch (err) {
-            console.warn("Index missing for user_id on project_collaborators, falling back to manual filter.");
-            try {
-                // Fallback: fetch up to 5000 and filter
-                const allCollabs = await databases.listDocuments(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-                    [Query.limit(5000)]
-                );
-
-                allCollabs.documents
-                    .filter((doc: any) => doc.user_id === user.$id)
-                    .forEach((doc: any) => {
-                        collabProjectIds.push(doc.project_id);
-                        collabRoles[doc.project_id] = doc.role;
-                    });
-            } catch (fallbackErr) {
-                console.error("Collaborators fallback fetch failed (Appwrite might be paused/offline):", fallbackErr);
-            }
+            console.error("Failed to fetch collaborators from Supabase:", err);
         }
 
         // 3. Fetch missing projects from Supabase
@@ -111,17 +89,13 @@ export async function GET(request: Request) {
         allProjects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
         // 5. Fetch Real-time Counts for each project
-        const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-        const collabCollId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!;
-
         const projectsWithStats = await Promise.all(allProjects.map(async (project) => {
             try {
-                // Get collaborator count
-                const collabs = await databases.listDocuments(
-                    databaseId,
-                    collabCollId,
-                    [Query.equal("project_id", project.id), Query.limit(1)]
-                );
+                // Get collaborator count from Supabase
+                const { count: collabCount } = await supabase
+                    .from("project_collaborators")
+                    .select("*", { count: 'exact', head: true })
+                    .eq("project_id", project.id);
 
                 // Get pending asset count from Supabase
                 const { count: pendingCount } = await supabase
@@ -132,14 +106,14 @@ export async function GET(request: Request) {
 
                 return {
                     ...project,
-                    collaboratorCount: collabs.total,
+                    collaboratorCount: (collabCount || 0) + 1, // Include the owner
                     pendingCount: pendingCount || 0
                 };
             } catch (err) {
                 console.error(`Failed to fetch stats for project ${project.id}:`, err);
                 return {
                     ...project,
-                    collaboratorCount: 0,
+                    collaboratorCount: 1, // At least the owner
                     pendingCount: 0
                 };
             }
@@ -201,31 +175,12 @@ export async function POST(request: Request) {
             status: project.status ? (project.status.charAt(0).toUpperCase() + project.status.slice(1)) : "Active",
         };
 
-        const { databases } = await createAdminClient();
-
-        // 2. Create collaborator in Appwrite using Admin Client (bypasses permission checks)
+        // 2. Owner is implicit in Supabase (owner_id field on project), so no need to create a collaborator row in Supabase or Appwrite
+        // 3. Create Activity Log in Supabase
         try {
-            await databases.createDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-                ID.unique(),
-                {
-                    project_id: project.id,
-                    user_id: user.$id,
-                    role: "owner"
-                }
-            );
-        } catch (collabError) {
-            console.error("Failed to insert owner as collaborator in Appwrite:", collabError);
-        }
-
-        // 3. Create Activity Log in Appwrite
-        try {
-            await databases.createDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
-                ID.unique(),
-                {
+            await supabase
+                .from("activity_logs")
+                .insert({
                     project_id: project.id,
                     user_id: user.$id,
                     user_email: user.email,
@@ -233,15 +188,9 @@ export async function POST(request: Request) {
                     entity_type: "project",
                     entity_id: project.id,
                     metadata: JSON.stringify({ project_name: name })
-                },
-                [
-                    Permission.read(Role.users()),
-                    Permission.update(Role.user(user.$id)),
-                    Permission.delete(Role.user(user.$id))
-                ]
-            );
+                });
         } catch (logError) {
-            console.error("Failed to log project creation activity in Appwrite:", logError);
+            console.error("Failed to log project creation activity in Supabase:", logError);
         }
 
         return NextResponse.json(mappedProject);

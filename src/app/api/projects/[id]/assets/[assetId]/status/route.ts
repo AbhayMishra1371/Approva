@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
-import { Query, ID } from "node-appwrite";
+import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 import { AssetController } from "@/modules/assets/asset.controller";
 
 export const dynamic = "force-dynamic";
@@ -26,33 +24,37 @@ export async function POST(
             return NextResponse.json({ error: "Invalid status" }, { status: 400 });
         }
 
-        const { databases } = await createAdminClient();
 
-        // 1. Verify caller has access to this project and sufficient role
-        const callerAccess = await databases.listDocuments(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-            [
-                Query.equal("project_id", projectId),
-                Query.equal("user_id", user.$id),
-                Query.limit(1)
-            ]
-        );
 
-        let role = "viewer";
-        // Also check if caller is the owner in Supabase
+        // 1. Verify caller has access to this project and check their role in Supabase
         const supabase = await createSupabaseServerClient();
-        const { data: project } = await supabase
+        const { data: project, error: projErr } = await supabase
             .from("projects")
             .select("owner_id")
             .eq("id", projectId)
             .single();
 
-        if (project && project.owner_id === user.$id) {
+        if (projErr || !project) {
+            return NextResponse.json({ error: "Project not found" }, { status: 404 });
+        }
+
+        let role = "";
+        if (project.owner_id === user.$id) {
             role = "owner";
-        } else if (callerAccess.total > 0) {
-            role = callerAccess.documents[0].role;
         } else {
+            const { data: collab } = await supabase
+                .from("project_collaborators")
+                .select("role")
+                .eq("project_id", projectId)
+                .eq("user_id", user.$id)
+                .maybeSingle();
+
+            if (collab) {
+                role = collab.role === 'member' ? 'viewer' : collab.role;
+            }
+        }
+
+        if (!role) {
             return NextResponse.json({ error: "Unauthorized access to project" }, { status: 403 });
         }
 
@@ -68,7 +70,7 @@ export async function POST(
         }
 
         // 3. Update the Asset Document and optionally log it
-        const assetController = new AssetController(databases);
+        const assetController = new AssetController(null);
         const updatedAsset = await assetController.updateAssetStatus(user, projectId, assetId, status, comment);
 
         return NextResponse.json({ success: true, asset: { ...updatedAsset, id: updatedAsset.$id } });

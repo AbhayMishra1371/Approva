@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
-import { Query } from "node-appwrite";
+import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+
 
 export const dynamic = "force-dynamic";
 

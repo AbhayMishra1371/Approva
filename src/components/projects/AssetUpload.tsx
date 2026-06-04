@@ -105,6 +105,26 @@ export function AssetUpload({ projectId, onUploadSuccess, hideWhenIdle, assetGro
 
             if (dbError) throw dbError;
 
+            // Create Activity Log in Supabase
+            try {
+                await supabase
+                    .from("activity_logs")
+                    .insert({
+                        project_id: projectId,
+                        user_id: user.id,
+                        user_email: user.email || "",
+                        action: isNewVersion ? "uploaded_new_version" : "uploaded_asset",
+                        entity_type: "asset",
+                        entity_id: assetDoc.id,
+                        metadata: JSON.stringify({
+                            file_name: file.name,
+                            version: `v${newVersionNumber}`
+                        })
+                    });
+            } catch (logError) {
+                console.error("Failed to log asset upload activity:", logError);
+            }
+
             setProgress(100);
             setSuccess(true);
 

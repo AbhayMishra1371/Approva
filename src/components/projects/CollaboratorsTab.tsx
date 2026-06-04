@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Users, UserPlus } from "lucide-react";
-import { createBrowserClient } from "@/lib/appwrite/client";
+import { getJwt } from "@/lib/auth/auth";
 import { toast } from "sonner";
 import {
     Select,
@@ -26,8 +26,7 @@ export function CollaboratorsTab({ projectId, currentRole }: CollaboratorsTabPro
     useEffect(() => {
         const fetchCollaborators = async () => {
             try {
-                const { account } = createBrowserClient();
-                const { jwt } = await account.createJWT();
+                const jwt = await getJwt();
                 const res = await fetch(`/api/projects/collaborators?projectId=${projectId}`, {
                     headers: { "Authorization": `Bearer ${jwt}` }
                 });
@@ -52,8 +51,7 @@ export function CollaboratorsTab({ projectId, currentRole }: CollaboratorsTabPro
 
     const updateRole = async (collaboratorId: string, newRole: string) => {
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
 
             const res = await fetch(`/api/projects/collaborators`, {
                 method: 'PATCH',

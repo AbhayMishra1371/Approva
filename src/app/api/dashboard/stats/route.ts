@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
+import { getLoggedInUser } from "@/lib/supabase/server";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
-import { Query } from "node-appwrite";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +11,7 @@ export async function GET() {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { databases } = await createAdminClient();
-        const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-        const assetsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!;
-        const collaboratorsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!;
-        const invitesCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID!;
-        const activityLogCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs";
-
-        // 1. Get User's Project IDs (Owned + Collaborative) from Supabase & Appwrite
+        // 1. Get User's Project IDs (Owned + Collaborative) from Supabase
         const supabase = await createSupabaseServerClient();
         let ownedIds: string[] = [];
         try {
@@ -34,10 +26,14 @@ export async function GET() {
 
         let collabIds: string[] = [];
         try {
-            const collabRes = await databases.listDocuments(databaseId, collaboratorsCollectionId, [Query.equal("user_id", user.$id)]);
-            collabIds = collabRes.documents.map(d => d.project_id);
+            const { data: collabs, error: collabsErr } = await supabase
+                .from("project_collaborators")
+                .select("project_id")
+                .eq("user_id", user.$id);
+            if (collabsErr) throw collabsErr;
+            collabIds = (collabs || []).map((c: any) => c.project_id);
         } catch (e) {
-            console.warn("Could not query collaborator projects from Appwrite for stats:", e);
+            console.warn("Could not query collaborator projects from Supabase for stats:", e);
         }
 
         const allProjectIds = Array.from(new Set([...ownedIds, ...collabIds]));
@@ -54,21 +50,33 @@ export async function GET() {
             });
         }
 
-        // 2. Fetch Invites (Filter by email) - Move to server to avoid "Not Authorized" browser error
-        const invitesRes = await databases.listDocuments(databaseId, invitesCollectionId, [Query.equal("email", user.email)]);
-        const invitesPromises = invitesRes.documents.map(async (invite: any) => {
-            try {
-                const { data: proj } = await supabase
-                    .from("projects")
-                    .select("name")
-                    .eq("id", invite.project_id)
-                    .single();
-                return { ...invite, id: invite.$id, projects: { name: proj?.name || "Unknown Project" } };
-            } catch {
-                return { ...invite, id: invite.$id, projects: { name: "Unknown Project" } };
+        // 2. Fetch Invites (Filter by email) from Supabase
+        let formattedInvites: any[] = [];
+        try {
+            const { data: invitesRes, error: invitesErr } = await supabase
+                .from("project_invites")
+                .select("*")
+                .eq("email", user.email)
+                .eq("status", "pending");
+
+            if (!invitesErr && invitesRes) {
+                const invitesPromises = invitesRes.map(async (invite: any) => {
+                    try {
+                        const { data: proj } = await supabase
+                            .from("projects")
+                            .select("name")
+                            .eq("id", invite.project_id)
+                            .single();
+                        return { ...invite, id: invite.id, projects: { name: proj?.name || "Unknown Project" } };
+                    } catch {
+                        return { ...invite, id: invite.id, projects: { name: "Unknown Project" } };
+                    }
+                });
+                formattedInvites = await Promise.all(invitesPromises);
             }
-        });
-        const formattedInvites = await Promise.all(invitesPromises);
+        } catch (e) {
+            console.warn("Could not query project invites from Supabase for stats:", e);
+        }
 
         // 3. Stats for Filtered Projects
         const { count: totalAssets, error: totalErr } = await supabase
@@ -85,13 +93,22 @@ export async function GET() {
         // Approved Today: Accurate count from activity logs for today's approvals
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
-        const approvedTodayLogRes = await databases.listDocuments(databaseId, activityLogCollectionId, [
-            Query.equal("project_id", allProjectIds),
-            Query.equal("action", "approved_asset"),
-            Query.greaterThanEqual("$createdAt", startOfDay.toISOString()),
-            Query.limit(1)
-        ]);
-        const approvedToday = approvedTodayLogRes.total;
+        
+        let approvedToday = 0;
+        try {
+            const { count, error: approvedTodayErr } = await supabase
+                .from("activity_logs")
+                .select("*", { count: 'exact', head: true })
+                .in("project_id", allProjectIds)
+                .eq("action", "approved_asset")
+                .gte("created_at", startOfDay.toISOString());
+            
+            if (!approvedTodayErr) {
+                approvedToday = count || 0;
+            }
+        } catch (e) {
+            console.warn("Could not query approved today stats from Supabase:", e);
+        }
 
         const { count: rejectedCount } = await supabase
             .from("assets")

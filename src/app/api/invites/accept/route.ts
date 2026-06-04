@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
-import { ID, Query, Permission, Role } from "node-appwrite";
+import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +11,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { databases: adminDatabases } = await createAdminClient();
+        const supabase = await createSupabaseServerClient();
 
         const json = await request.json();
         const { token } = json;
@@ -21,18 +20,17 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Missing required field (token)" }, { status: 400 });
         }
 
-        // 1. Fetch the invite to verify it exists and matches user email
-        const invitesRes = await adminDatabases.listDocuments(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID!,
-            [Query.equal("token", token)]
-        );
+        // 1. Fetch the invite to verify it exists and matches user email in Supabase
+        const { data: inviteObj, error: inviteErr } = await supabase
+            .from("project_invites")
+            .select("*")
+            .eq("token", token)
+            .eq("status", "pending")
+            .single();
 
-        if (invitesRes.total === 0) {
+        if (inviteErr || !inviteObj) {
             return NextResponse.json({ error: "Invite not found or already accepted." }, { status: 404 });
         }
-
-        const inviteObj = invitesRes.documents[0];
 
         // 2. Email validation - strictly enforce that the logged in user matches the invite
         if (inviteObj.email !== user.email) {
@@ -45,59 +43,61 @@ export async function POST(request: Request) {
             }, { status: 403 });
         }
 
-        // 2. Check if already a collaborator
-        const existingCollab = await adminDatabases.listDocuments(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-            [
-                Query.equal("project_id", inviteObj.project_id),
-                Query.equal("user_id", user.$id)
-            ]
-        );
+        // 3. Check if already a collaborator in Supabase
+        const { data: existingCollab, error: collabErr } = await supabase
+            .from("project_collaborators")
+            .select("id")
+            .eq("project_id", inviteObj.project_id)
+            .eq("user_id", user.$id)
+            .maybeSingle();
 
-        if (existingCollab.total > 0) {
-            // Cleanup the invite
-            await adminDatabases.deleteDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID!,
-                inviteObj.$id
-            );
+        // Also check if the user is the project owner
+        const { data: project } = await supabase
+            .from("projects")
+            .select("owner_id")
+            .eq("id", inviteObj.project_id)
+            .single();
+
+        if (existingCollab || (project && project.owner_id === user.$id)) {
+            // Update the invite status to accepted since they are already in the project
+            await supabase
+                .from("project_invites")
+                .update({ status: "accepted" })
+                .eq("id", inviteObj.id);
             return NextResponse.json({ error: "You are already a collaborator on this project" }, { status: 409 });
         }
 
-        // 3. Insert into project_collaborators
-        const newCollab = await adminDatabases.createDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-            ID.unique(),
-            {
+        // 4. Insert into project_collaborators in Supabase
+        // Map the role from inviteObj.role ('viewer' -> 'member' for Supabase DB)
+        const dbRole = inviteObj.role === 'viewer' ? 'member' : inviteObj.role;
+
+        const { data: newCollab, error: insertCollabErr } = await supabase
+            .from("project_collaborators")
+            .insert({
                 project_id: inviteObj.project_id,
                 user_id: user.$id,
-                role: inviteObj.role,
-            },
-            [
-                Permission.read(Role.user(user.$id)),
-                Permission.update(Role.user(user.$id)),
-                Permission.delete(Role.user(user.$id)),
-            ]
-        );
+                role: dbRole,
+            })
+            .select()
+            .single();
 
-        // 4. Update the Project Document permissions (skipped because projects are in Supabase)
-        console.log("Projects are managed in Supabase; skipping Appwrite project permission update.");
-
-        // 4. Delete the pending invite now that it was successfully consumed
-        await adminDatabases.deleteDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID!,
-            inviteObj.$id
-        );
-
-        return NextResponse.json({ ...newCollab, id: newCollab.$id });
-    } catch (error: any) {
-        if (error?.code === 404) {
-            return NextResponse.json({ error: "Invite not found" }, { status: 404 });
+        if (insertCollabErr || !newCollab) {
+            throw insertCollabErr || new Error("Failed to insert collaborator in Supabase");
         }
-        console.error("Appwrite Accept Error:", error?.message || error);
+
+        // 5. Update the pending invite status to accepted now that it was successfully consumed
+        await supabase
+            .from("project_invites")
+            .update({ status: "accepted" })
+            .eq("id", inviteObj.id);
+
+        return NextResponse.json({
+            ...newCollab,
+            id: newCollab.id,
+            role: newCollab.role === 'member' ? 'viewer' : newCollab.role
+        });
+    } catch (error: any) {
+        console.error("Accept Invite Error:", error?.message || error);
         return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
     }
 }
