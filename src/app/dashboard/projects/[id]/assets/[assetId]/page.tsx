@@ -307,9 +307,15 @@ export default function AssetDetailPage() {
             } catch (logError) {
                 console.error("Failed to log annotation activity:", logError);
             }
-        } catch (error) {
-            console.error("Failed to save annotation in Supabase:", error);
-            toast.error("Failed to save annotation in Supabase.");
+        } catch (error: any) {
+            console.error("Failed to save annotation in Supabase:", {
+                message: error?.message,
+                details: error?.details,
+                hint: error?.hint,
+                code: error?.code,
+                error
+            });
+            toast.error(`Failed to save annotation: ${error?.message || "Unknown error"}`);
         }
     };
  
@@ -359,9 +365,15 @@ export default function AssetDetailPage() {
             }
  
  
-        } catch (e) {
-            console.error("Failed to save comment in Supabase:", e);
-            toast.error("Failed to save comment.");
+        } catch (e: any) {
+            console.error("Failed to save comment in Supabase:", {
+                message: e?.message,
+                details: e?.details,
+                hint: e?.hint,
+                code: e?.code,
+                e
+            });
+            toast.error(`Failed to save comment: ${e?.message || "Unknown error"}`);
         }
     };
  
@@ -402,9 +414,15 @@ export default function AssetDetailPage() {
             setSelectedAnnotation(null);
             setComments([]);
             toast.success("Annotation approved and removed");
-        } catch (e) {
-            console.error("Failed to resolve annotation in Supabase:", e);
-            toast.error("Failed to approve annotation");
+        } catch (e: any) {
+            console.error("Failed to resolve annotation in Supabase:", {
+                message: e?.message,
+                details: e?.details,
+                hint: e?.hint,
+                code: e?.code,
+                e
+            });
+            toast.error(`Failed to approve annotation: ${e?.message || "Unknown error"}`);
         }
     };
  
@@ -423,9 +441,15 @@ export default function AssetDetailPage() {
             setSelectedAnnotation(null);
             setComments([]); // Clear comments
             toast.success("Annotation deleted successfully");
-        } catch (e) {
-            console.error("Failed to delete annotation in Supabase:", e);
-            toast.error("Failed to delete annotation.");
+        } catch (e: any) {
+            console.error("Failed to delete annotation in Supabase:", {
+                message: e?.message,
+                details: e?.details,
+                hint: e?.hint,
+                code: e?.code,
+                e
+            });
+            toast.error(`Failed to delete annotation: ${e?.message || "Unknown error"}`);
         }
     };
  
@@ -440,9 +464,15 @@ export default function AssetDetailPage() {
  
             setComments(comments.filter(c => c.$id !== commentId));
             toast.success("Comment deleted successfully");
-        } catch (e) {
-            console.error("Failed to delete comment in Supabase:", e);
-            toast.error("Failed to delete comment.");
+        } catch (e: any) {
+            console.error("Failed to delete comment in Supabase:", {
+                message: e?.message,
+                details: e?.details,
+                hint: e?.hint,
+                code: e?.code,
+                e
+            });
+            toast.error(`Failed to delete comment: ${e?.message || "Unknown error"}`);
         }
     };
  
@@ -478,9 +508,15 @@ export default function AssetDetailPage() {
  
             setNewGeneralComment("");
             setGeneralMentionedUserIds([]);
-        } catch (error) {
-            console.error("Failed to save general comment in Supabase:", error);
-            toast.error("Failed to send comment. Ensure the 'general_comments' table is created with attributes 'asset_id', 'user_id', 'user_email', 'text', and 'mentions'.");
+        } catch (error: any) {
+            console.error("Failed to save general comment in Supabase:", {
+                message: error?.message,
+                details: error?.details,
+                hint: error?.hint,
+                code: error?.code,
+                error
+            });
+            toast.error(`Failed to send comment: ${error?.message || "Unknown error"}`);
         } finally {
             setIsSubmittingGeneralComment(false);
         }
