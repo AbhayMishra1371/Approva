@@ -61,6 +61,10 @@ export type GeneralComment = {
     user_email: string;
     text: string;
     created_at: string;
+    profiles?: {
+        name: string;
+        avatar_url: string | null;
+    } | null;
 };
 
 export default function AssetDetailPage() {
@@ -77,6 +81,7 @@ export default function AssetDetailPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [userEmail, setUserEmail] = useState<string>("");
     const [currentUserId, setCurrentUserId] = useState<string>("");
+    const [currentUserProfile, setCurrentUserProfile] = useState<{ name: string; avatar_url: string | null } | null>(null);
     const [currentColor, setCurrentColor] = useState("#a855f7");
     const [activeSidebarTab, setActiveSidebarTab] = useState<'comments' | 'fields'>('comments');
 
@@ -122,6 +127,16 @@ export default function AssetDetailPage() {
                 if (user) {
                     setUserEmail(user.email || "");
                     setCurrentUserId(user.id);
+
+                    // Fetch current user's profile
+                    const { data: profile } = await supabase
+                        .from("profiles")
+                        .select("name, avatar_url")
+                        .eq("id", user.id)
+                        .single();
+                    if (profile) {
+                        setCurrentUserProfile(profile);
+                    }
                 }
 
                 // Fetch Asset
@@ -164,7 +179,13 @@ export default function AssetDetailPage() {
                 try {
                     const { data: genCommDocs, error: genCommErr } = await supabase
                         .from("general_comments")
-                        .select("*")
+                        .select(`
+                            *,
+                            profiles (
+                                name,
+                                avatar_url
+                            )
+                        `)
                         .eq("asset_id", assetId)
                         .order("created_at", { ascending: true });
 
@@ -175,7 +196,8 @@ export default function AssetDetailPage() {
                         user_id: doc.user_id,
                         user_email: doc.user_email,
                         text: doc.text,
-                        created_at: doc.created_at
+                        created_at: doc.created_at,
+                        profiles: doc.profiles
                     })));
                 } catch (e) {
                     console.error("Error fetching general comments from Supabase:", e);
@@ -241,7 +263,13 @@ export default function AssetDetailPage() {
         try {
             const { data: commentDocs, error: commentErr } = await supabase
                 .from("comments")
-                .select("*")
+                .select(`
+                    *,
+                    profiles (
+                        name,
+                        avatar_url
+                    )
+                `)
                 .eq("annotation_id", annotationId)
                 .order("created_at", { ascending: true });
 
@@ -252,7 +280,8 @@ export default function AssetDetailPage() {
                 user_id: doc.user_id,
                 user_email: doc.user_email,
                 text: doc.text,
-                created_at: doc.created_at
+                created_at: doc.created_at,
+                profiles: doc.profiles
             })));
         } catch (e) {
             console.error("Error fetching comments from Supabase:", e);
@@ -333,7 +362,13 @@ export default function AssetDetailPage() {
                     text: text,
                     mentions: mentions || []
                 })
-                .select()
+                .select(`
+                    *,
+                    profiles (
+                        name,
+                        avatar_url
+                    )
+                `)
                 .single();
 
             if (insertErr) throw insertErr;
@@ -344,7 +379,8 @@ export default function AssetDetailPage() {
                 user_email: userEmail,
                 text: text,
                 created_at: doc.created_at,
-                mentions: mentions || []
+                mentions: mentions || [],
+                profiles: doc.profiles
             } as any]);
  
             // Create Activity Log
@@ -490,7 +526,13 @@ export default function AssetDetailPage() {
                     text: newGeneralComment.trim(),
                     mentions: generalMentionedUserIds
                 })
-                .select()
+                .select(`
+                    *,
+                    profiles (
+                        name,
+                        avatar_url
+                    )
+                `)
                 .single();
 
             if (insertErr) throw insertErr;
@@ -501,7 +543,8 @@ export default function AssetDetailPage() {
                 user_email: userEmail,
                 text: newGeneralComment.trim(),
                 created_at: doc.created_at,
-                mentions: generalMentionedUserIds
+                mentions: generalMentionedUserIds,
+                profiles: doc.profiles
             } as any]);
  
  
@@ -613,7 +656,8 @@ export default function AssetDetailPage() {
                         user_id: currentUserId,
                         user_email: userEmail,
                         text: comment,
-                        created_at: new Date().toISOString()
+                        created_at: new Date().toISOString(),
+                        profiles: currentUserProfile
                     }]);
 
                     // Create Activity Log ONLY if approved
@@ -910,10 +954,20 @@ export default function AssetDetailPage() {
                                         <div key={comment.$id} className="bg-[#1f202b] rounded-xl p-3 border border-[#2a2b36]">
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 uppercase">
-                                                        {comment.user_email?.[0] || '?'}
-                                                    </div>
-                                                    <span className="text-xs font-bold text-white">{comment.user_email?.split('@')[0] || 'Unknown User'}</span>
+                                                    {comment.profiles?.avatar_url ? (
+                                                        <img
+                                                            src={comment.profiles.avatar_url}
+                                                            alt={comment.profiles.name || 'Avatar'}
+                                                            className="w-6 h-6 rounded-full object-cover shrink-0"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 uppercase">
+                                                            {(comment.profiles?.name || comment.user_email)?.[0] || '?'}
+                                                        </div>
+                                                    )}
+                                                    <span className="text-xs font-bold text-white">
+                                                        {comment.profiles?.name || comment.user_email?.split('@')[0] || 'Unknown User'}
+                                                    </span>
                                                 </div>
                                                 <span className="text-[10px] text-slate-500 mt-0.5">
                                                     {new Date(comment.created_at).toLocaleDateString()}

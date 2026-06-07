@@ -20,6 +20,10 @@ export type Comment = {
     user_email: string;
     text: string;
     created_at: string;
+    profiles?: {
+        name: string;
+        avatar_url: string | null;
+    } | null;
 };
 
 interface CommentThreadProps {
@@ -167,14 +171,22 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                 ) : (
                     comments.map((comment) => (
                         <div key={comment.$id} className="flex gap-3 group">
-                            <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                                <User className="w-4 h-4 text-purple-400" />
-                            </div>
+                            {comment.profiles?.avatar_url ? (
+                                <img
+                                    src={comment.profiles.avatar_url}
+                                    alt={comment.profiles.name || 'Avatar'}
+                                    className="w-8 h-8 rounded-full object-cover shrink-0"
+                                />
+                            ) : (
+                                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0 font-bold text-xs text-purple-400 shrink-0">
+                                    {(comment.profiles?.name || comment.user_email)?.[0]?.toUpperCase() || '?'}
+                                </div>
+                            )}
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs font-bold text-white truncate max-w-[120px]">
-                                            {comment.user_email.split('@')[0]}
+                                            {comment.profiles?.name || comment.user_email.split('@')[0]}
                                         </span>
                                         <span className="text-[10px] text-slate-500">
                                             {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
