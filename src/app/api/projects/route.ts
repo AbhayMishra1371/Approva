@@ -175,7 +175,23 @@ export async function POST(request: Request) {
             status: project.status ? (project.status.charAt(0).toUpperCase() + project.status.slice(1)) : "Active",
         };
 
-        // 2. Owner is implicit in Supabase (owner_id field on project), so no need to create a collaborator row in Supabase or Appwrite
+        // 2. Add owner to project_collaborators as owner
+        try {
+            const { error: collabError } = await supabase
+                .from("project_collaborators")
+                .insert({
+                    project_id: project.id,
+                    user_id: user.$id,
+                    role: "owner"
+                });
+
+            if (collabError) {
+                console.error("Failed to add owner as collaborator in project_collaborators:", collabError);
+            }
+        } catch (collabErr) {
+            console.error("Error inserting owner as collaborator:", collabErr);
+        }
+
         // 3. Create Activity Log in Supabase
         try {
             await supabase

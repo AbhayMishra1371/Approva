@@ -262,16 +262,6 @@ export default function DynamicProfilePage() {
                         {/* Account Stats / Details */}
                         <div className="w-full mt-10 grid grid-cols-1 gap-4 pt-8 border-t border-[#1f202b]">
                             <div className="flex items-center gap-4 bg-[#1e1f2b]/30 p-4 rounded-xl border border-transparent hover:border-[#2a2b36] hover:bg-[#1e1f2b]/50 transition-all">
-                                <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                                    <IdCard className="w-5 h-5 text-indigo-400" />
-                                </div>
-                                <div className="text-left min-w-0">
-                                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest leading-none mb-1">Account ID</p>
-                                    <p className="text-xs text-slate-300 font-mono truncate">{profileUser.id}</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-4 bg-[#1e1f2b]/30 p-4 rounded-xl border border-transparent hover:border-[#2a2b36] hover:bg-[#1e1f2b]/50 transition-all">
                                 <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
                                     <Calendar className="w-5 h-5 text-amber-400" />
                                 </div>

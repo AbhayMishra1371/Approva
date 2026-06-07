@@ -620,17 +620,33 @@ export default function AssetDetailPage() {
         const parts = text.split(regex);
 
         return parts.map((part, index) => {
-            const isCollaboratorName = (collaborators || []).some(c => c.name === part);
-            if (part.startsWith('@') || isCollaboratorName) {
+            const collaborator = (collaborators || []).find(c => c.name === part);
+
+            if (collaborator) {
                 return (
-                    <span
+                    <Link
                         key={index}
-                        className="text-purple-400 font-medium font-bold"
+                        href={`/dashboard/profile/${collaborator.username}`}
+                        className="text-purple-400 font-medium font-bold hover:underline cursor-pointer"
                     >
                         {part}
-                    </span>
+                    </Link>
                 );
             }
+
+            if (part.startsWith('@')) {
+                const username = part.substring(1);
+                return (
+                    <Link
+                        key={index}
+                        href={`/dashboard/profile/${username}`}
+                        className="text-purple-400 font-medium font-bold hover:underline cursor-pointer"
+                    >
+                        {part}
+                    </Link>
+                );
+            }
+
             return <React.Fragment key={index}>{part}</React.Fragment>;
         });
     };
@@ -966,32 +982,59 @@ export default function AssetDetailPage() {
                                         No general comments yet. Be the first to share your thoughts!
                                     </div>
                                 ) : (
-                                    generalComments.map(comment => (
-                                        <div key={comment.$id} className="bg-[#1f202b] rounded-xl p-3 border border-[#2a2b36]">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    {comment.profiles?.avatar_url ? (
-                                                        <img
-                                                            src={comment.profiles.avatar_url}
-                                                            alt={comment.profiles.name || 'Avatar'}
-                                                            className="w-6 h-6 rounded-full object-cover shrink-0"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 uppercase">
-                                                            {(comment.profiles?.name || comment.user_email)?.[0] || '?'}
-                                                        </div>
-                                                    )}
-                                                    <span className="text-xs font-bold text-white">
-                                                        {comment.profiles?.name || comment.user_email?.split('@')[0] || 'Unknown User'}
+                                    (() => {
+                                        const grouped: Array<{
+                                            user_id: string;
+                                            user_email: string;
+                                            profiles: any;
+                                            comments: GeneralComment[];
+                                        }> = [];
+                                        
+                                        generalComments.forEach(comment => {
+                                            const lastGroup = grouped[grouped.length - 1];
+                                            if (lastGroup && lastGroup.user_id === comment.user_id) {
+                                                lastGroup.comments.push(comment);
+                                            } else {
+                                                grouped.push({
+                                                    user_id: comment.user_id,
+                                                    user_email: comment.user_email,
+                                                    profiles: comment.profiles,
+                                                    comments: [comment]
+                                                });
+                                            }
+                                        });
+
+                                        return grouped.map((group, gIndex) => (
+                                            <div key={gIndex} className="bg-[#1f202b] rounded-xl p-3 border border-[#2a2b36] space-y-3">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex items-center gap-2">
+                                                        {group.profiles?.avatar_url ? (
+                                                            <img
+                                                                src={group.profiles.avatar_url}
+                                                                alt={group.profiles.name || 'Avatar'}
+                                                                className="w-6 h-6 rounded-full object-cover shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 uppercase">
+                                                                {(group.profiles?.name || group.user_email)?.[0] || '?'}
+                                                            </div>
+                                                        )}
+                                                        <span className="text-xs font-bold text-white">
+                                                            {group.profiles?.name || group.user_email?.split('@')[0] || 'Unknown User'}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-500 mt-0.5">
+                                                        {new Date(group.comments[0].created_at).toLocaleDateString()}
                                                     </span>
                                                 </div>
-                                                <span className="text-[10px] text-slate-500 mt-0.5">
-                                                    {new Date(comment.created_at).toLocaleDateString()}
-                                                </span>
+                                                <div className="space-y-2 ml-8">
+                                                    {group.comments.map(c => (
+                                                        <p key={c.$id} className="text-xs text-slate-300 whitespace-pre-wrap">{renderGeneralCommentText(c.text)}</p>
+                                                    ))}
+                                                </div>
                                             </div>
-                                            <p className="text-xs text-slate-300 whitespace-pre-wrap ml-8">{renderGeneralCommentText(comment.text)}</p>
-                                        </div>
-                                    ))
+                                        ));
+                                    })()
                                 )}
                             </div>
 

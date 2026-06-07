@@ -247,30 +247,6 @@ export async function GET(request: Request) {
       };
     });
 
-    // Fetch and prepend the owner profile dynamically
-    try {
-      const { data: ownerProfile, error: ownerErr } = await supabase
-        .from("profiles")
-        .select("id, name, email, username, avatar_url")
-        .eq("id", project.owner_id)
-        .single();
-
-      if (!ownerErr && ownerProfile) {
-        collaborators.unshift({
-          id: `owner-${ownerProfile.id}`,
-          user_id: ownerProfile.id,
-          role: "owner",
-          created_at: project.created_at,
-          email: ownerProfile.email,
-          name: ownerProfile.name,
-          username: ownerProfile.username,
-          avatar_url: ownerProfile.avatar_url || ""
-        });
-      }
-    } catch (e) {
-      console.warn("Could not prepend owner to collaborators list:", e);
-    }
-
     /* Fetch invites if admin/owner */
     let invites: any[] = [];
 

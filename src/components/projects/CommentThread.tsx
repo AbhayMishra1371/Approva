@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Send, User, X, CheckCircle, Trash2 } from 'lucide-react';
+import Link from 'next/link';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -128,17 +129,33 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
         const parts = text.split(regex);
 
         return parts.map((part, index) => {
-            const isCollaboratorName = (collaborators || []).some(c => c.name === part);
-            if (part.startsWith('@') || isCollaboratorName) {
+            const collaborator = (collaborators || []).find(c => c.name === part);
+
+            if (collaborator) {
                 return (
-                    <span
+                    <Link
                         key={index}
-                        className="text-purple-400 font-bold"
+                        href={`/dashboard/profile/${collaborator.username}`}
+                        className="text-purple-400 font-bold hover:underline cursor-pointer"
                     >
                         {part}
-                    </span>
+                    </Link>
                 );
             }
+
+            if (part.startsWith('@')) {
+                const username = part.substring(1);
+                return (
+                    <Link
+                        key={index}
+                        href={`/dashboard/profile/${username}`}
+                        className="text-purple-400 font-bold hover:underline cursor-pointer"
+                    >
+                        {part}
+                    </Link>
+                );
+            }
+
             return <React.Fragment key={index}>{part}</React.Fragment>;
         });
     };
@@ -203,60 +220,87 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                         <p className="text-slate-500 text-xs">No comments yet. Start the conversation!</p>
                     </div>
                 ) : (
-                    comments.map((comment) => (
-                        <div key={comment.$id} className="flex gap-3 group">
-                            {comment.profiles?.avatar_url ? (
-                                <img
-                                    src={comment.profiles.avatar_url}
-                                    alt={comment.profiles.name || 'Avatar'}
-                                    className="w-8 h-8 rounded-full object-cover shrink-0"
-                                />
-                            ) : (
-                                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0 font-bold text-xs text-purple-400 shrink-0">
-                                    {(comment.profiles?.name || comment.user_email)?.[0]?.toUpperCase() || '?'}
-                                </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1">
-                                    <div className="flex items-center gap-2">
+                    (() => {
+                        const grouped: Array<{
+                            user_id: string;
+                            user_email: string;
+                            profiles: any;
+                            comments: Comment[];
+                        }> = [];
+
+                        comments.forEach(comment => {
+                            const lastGroup = grouped[grouped.length - 1];
+                            if (lastGroup && lastGroup.user_id === comment.user_id) {
+                                lastGroup.comments.push(comment);
+                            } else {
+                                grouped.push({
+                                    user_id: comment.user_id,
+                                    user_email: comment.user_email,
+                                    profiles: comment.profiles,
+                                    comments: [comment]
+                                });
+                            }
+                        });
+
+                        return grouped.map((group, groupIndex) => (
+                            <div key={groupIndex} className="flex gap-3 group/group-item">
+                                {group.profiles?.avatar_url ? (
+                                    <img
+                                        src={group.profiles.avatar_url}
+                                        alt={group.profiles.name || 'Avatar'}
+                                        className="w-8 h-8 rounded-full object-cover shrink-0"
+                                    />
+                                ) : (
+                                    <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0 font-bold text-xs text-purple-400 shrink-0">
+                                        {(group.profiles?.name || group.user_email)?.[0]?.toUpperCase() || '?'}
+                                    </div>
+                                )}
+                                <div className="flex-1 min-w-0 space-y-2">
+                                    <div className="flex items-center gap-2 mb-1">
                                         <span className="text-xs font-bold text-white truncate max-w-[120px]">
-                                            {comment.profiles?.name || comment.user_email.split('@')[0]}
+                                            {group.profiles?.name || group.user_email.split('@')[0]}
                                         </span>
                                         <span className="text-[10px] text-slate-500">
-                                            {new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {new Date(group.comments[0].created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
-                                    {!readOnly && currentUserId && comment.user_id === currentUserId && (
-                                        <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                                <button
-                                                    className="p-1 hover:bg-rose-500/10 text-rose-500 rounded transition-colors opacity-0 group-hover:opacity-100"
-                                                    title="Delete Comment"
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
-                                            </AlertDialogTrigger>
-                                            <AlertDialogContent className="bg-[#12131a] border-[#1f202b] text-white max-w-sm rounded-[2rem]">
-                                                <AlertDialogHeader>
-                                                    <AlertDialogTitle>Delete comment?</AlertDialogTitle>
-                                                    <AlertDialogDescription className="text-slate-400">
-                                                        This will permanently delete this comment.
-                                                    </AlertDialogDescription>
-                                                </AlertDialogHeader>
-                                                <AlertDialogFooter>
-                                                    <AlertDialogCancel className="bg-[#1e1f2b] border-[#2a2b36] hover:bg-[#2a2b36] hover:text-white text-slate-300 h-9 px-4 rounded-xl text-xs font-semibold">Cancel</AlertDialogCancel>
-                                                    <AlertDialogAction onClick={() => onDeleteComment(comment.$id)} className="bg-rose-500 hover:bg-rose-600 text-white h-9 px-4 rounded-xl text-xs font-semibold shadow-xl shadow-rose-500/20">Delete</AlertDialogAction>
-                                                </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                        </AlertDialog>
-                                    )}
-                                </div>
-                                <div className="bg-[#12131a] rounded-xl p-3 text-sm text-slate-300 break-words border border-[#2a2b36]">
-                                    {renderCommentText(comment.text)}
+                                    <div className="space-y-1.5">
+                                        {group.comments.map((comment) => (
+                                            <div key={comment.$id} className="flex items-center gap-2 group/comment-item">
+                                                <div className="flex-1 bg-[#12131a] rounded-xl p-3 text-sm text-slate-300 break-words border border-[#2a2b36]">
+                                                    {renderCommentText(comment.text)}
+                                                </div>
+                                                {!readOnly && currentUserId && comment.user_id === currentUserId && (
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <button
+                                                                className="p-1 hover:bg-rose-500/10 text-rose-500 rounded transition-colors opacity-0 group-hover/comment-item:opacity-100 shrink-0"
+                                                                title="Delete Comment"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent className="bg-[#12131a] border-[#1f202b] text-white max-w-sm rounded-[2rem]">
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Delete comment?</AlertDialogTitle>
+                                                                <AlertDialogDescription className="text-slate-400">
+                                                                    This will permanently delete this comment.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel className="bg-[#1e1f2b] border-[#2a2b36] hover:bg-[#2a2b36] hover:text-white text-slate-300 h-9 px-4 rounded-xl text-xs font-semibold">Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => onDeleteComment(comment.$id)} className="bg-rose-500 hover:bg-rose-600 text-white h-9 px-4 rounded-xl text-xs font-semibold shadow-xl shadow-rose-500/20">Delete</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))
+                        ));
+                    })()
                 )}
             </div>
 
