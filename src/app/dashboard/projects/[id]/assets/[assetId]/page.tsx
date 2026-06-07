@@ -586,7 +586,7 @@ export default function AssetDetailPage() {
     const insertGeneralMention = (user: any) => {
         const beforeMention = newGeneralComment.substring(0, generalMentionIndex);
         const afterMention = newGeneralComment.substring(generalMentionIndex + generalMentionSearch.length + 1);
-        const updatedComment = `${beforeMention}@${user.username || user.name.split(' ')[0]} ${afterMention}`;
+        const updatedComment = `${beforeMention}${user.name} ${afterMention}`;
         setNewGeneralComment(updatedComment);
         setShowGeneralMentions(false);
         if (!generalMentionedUserIds.includes(user.user_id)) {
@@ -602,14 +602,30 @@ export default function AssetDetailPage() {
     });
 
     const renderGeneralCommentText = (text: string) => {
-        const parts = text.split(/(@\w+)/g);
+        if (!text) return "";
+
+        const escapeRegExp = (str: string) => {
+            return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        const patterns = (collaborators || [])
+            .map(c => c.name)
+            .filter(Boolean)
+            .map(name => escapeRegExp(name));
+
+        patterns.push(`@[\\w.-]+`);
+        patterns.sort((a, b) => b.length - a.length);
+
+        const regex = new RegExp(`(${patterns.join('|')})`, 'g');
+        const parts = text.split(regex);
+
         return parts.map((part, index) => {
-            if (part.startsWith('@')) {
-                const username = part.substring(1);
+            const isCollaboratorName = (collaborators || []).some(c => c.name === part);
+            if (part.startsWith('@') || isCollaboratorName) {
                 return (
                     <span
                         key={index}
-                        className="text-purple-400 font-medium"
+                        className="text-purple-400 font-medium font-bold"
                     >
                         {part}
                     </span>

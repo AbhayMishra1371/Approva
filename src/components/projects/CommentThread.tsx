@@ -94,7 +94,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     const insertMention = (user: any) => {
         const beforeMention = newComment.substring(0, mentionIndex);
         const afterMention = newComment.substring(mentionIndex + mentionSearch.length + 1);
-        const updatedComment = `${beforeMention}@${user.username || user.name.split(' ')[0]} ${afterMention}`;
+        const updatedComment = `${beforeMention}${user.name} ${afterMention}`;
         setNewComment(updatedComment);
         setShowMentions(false);
         if (!mentionedUserIds.includes(user.user_id)) {
@@ -108,6 +108,40 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
         const matchesName = c.name ? c.name.toLowerCase().includes(search) : false;
         return matchesUsername || matchesName;
     });
+
+    const renderCommentText = (text: string) => {
+        if (!text) return "";
+
+        const escapeRegExp = (str: string) => {
+            return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        const patterns = (collaborators || [])
+            .map(c => c.name)
+            .filter(Boolean)
+            .map(name => escapeRegExp(name));
+
+        patterns.push(`@[\\w.-]+`);
+        patterns.sort((a, b) => b.length - a.length);
+
+        const regex = new RegExp(`(${patterns.join('|')})`, 'g');
+        const parts = text.split(regex);
+
+        return parts.map((part, index) => {
+            const isCollaboratorName = (collaborators || []).some(c => c.name === part);
+            if (part.startsWith('@') || isCollaboratorName) {
+                return (
+                    <span
+                        key={index}
+                        className="text-purple-400 font-bold"
+                    >
+                        {part}
+                    </span>
+                );
+            }
+            return <React.Fragment key={index}>{part}</React.Fragment>;
+        });
+    };
 
     return (
         <div
@@ -218,7 +252,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                                     )}
                                 </div>
                                 <div className="bg-[#12131a] rounded-xl p-3 text-sm text-slate-300 break-words border border-[#2a2b36]">
-                                    {comment.text}
+                                    {renderCommentText(comment.text)}
                                 </div>
                             </div>
                         </div>
