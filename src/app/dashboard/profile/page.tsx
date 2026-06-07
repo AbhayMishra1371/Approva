@@ -12,9 +12,7 @@ export default function ProfilePage() {
             try {
                 const user = await getUser();
                 if (user) {
-                    // Get the username from the user's email
-                    const username = user.email?.split("@")[0] || "user";
-                    router.push(`/dashboard/profile/${username}`);
+                    router.push(`/dashboard/profile/${user.id}`);
                 } else {
                     // If not logged in, redirect to login
                     router.push("/login");

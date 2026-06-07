@@ -4,8 +4,8 @@ import { AssetData, UserContext } from "./asset.types";
 export class AssetController {
     private service: AssetService;
 
-    constructor(databases: any) {
-        this.service = new AssetService(databases);
+    constructor() {
+        this.service = new AssetService();
     }
 
     async getAllAssetsForUser(user: UserContext) {

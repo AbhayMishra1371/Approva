@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/appwrite/server";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
-import { Query, ID, Permission, Role } from "node-appwrite";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +11,6 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { databases } = await createAdminClient();
         const supabase = await createSupabaseServerClient();
 
         // 1. Fetch owned projects from Supabase

@@ -65,13 +65,21 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     const [showMentions, setShowMentions] = useState(false);
     const [mentionIndex, setMentionIndex] = useState(-1);
     const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
+    // Map of display-name -> userId for mentions inserted in this comment
+    const [mentionedUsers, setMentionedUsers] = useState<Array<{ name: string; userId: string }>>([]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newComment.trim()) return;
-        onAddComment(newComment, mentionedUserIds);
+        // Convert display names to @[Name](UUID) storage format
+        let submitText = newComment;
+        mentionedUsers.forEach(({ name, userId }) => {
+            submitText = submitText.replace(name, `@[${name}](${userId})`);
+        });
+        onAddComment(submitText, mentionedUserIds);
         setNewComment("");
         setMentionedUserIds([]);
+        setMentionedUsers([]);
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,12 +103,15 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     const insertMention = (user: any) => {
         const beforeMention = newComment.substring(0, mentionIndex);
         const afterMention = newComment.substring(mentionIndex + mentionSearch.length + 1);
+        // Show just the name in the input field
         const updatedComment = `${beforeMention}${user.name} ${afterMention}`;
         setNewComment(updatedComment);
         setShowMentions(false);
         if (!mentionedUserIds.includes(user.user_id)) {
             setMentionedUserIds([...mentionedUserIds, user.user_id]);
         }
+        // Track name -> userId mapping for submit conversion
+        setMentionedUsers(prev => [...prev, { name: user.name, userId: user.user_id }]);
     };
 
     const filteredCollaborators = collaborators.filter(c => {
@@ -113,6 +124,37 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     const renderCommentText = (text: string) => {
         if (!text) return "";
 
+        // Handle @[Name](userId) format
+        const markdownMentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+        if (markdownMentionRegex.test(text)) {
+            markdownMentionRegex.lastIndex = 0;
+            const segments: React.ReactNode[] = [];
+            let lastIdx = 0;
+            let match;
+            while ((match = markdownMentionRegex.exec(text)) !== null) {
+                if (match.index > lastIdx) {
+                    segments.push(<React.Fragment key={lastIdx}>{text.slice(lastIdx, match.index)}</React.Fragment>);
+                }
+                const displayName = match[1];
+                const userId = match[2];
+                segments.push(
+                    <Link
+                        key={match.index}
+                        href={`/dashboard/profile/${userId}`}
+                        className="text-purple-400 font-bold hover:underline cursor-pointer"
+                    >
+                        {displayName}
+                    </Link>
+                );
+                lastIdx = match.index + match[0].length;
+            }
+            if (lastIdx < text.length) {
+                segments.push(<React.Fragment key={lastIdx}>{text.slice(lastIdx)}</React.Fragment>);
+            }
+            return segments;
+        }
+
+        // Fallback: legacy plain-name mention format
         const escapeRegExp = (str: string) => {
             return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         };
@@ -122,40 +164,25 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
             .filter(Boolean)
             .map(name => escapeRegExp(name));
 
-        patterns.push(`@[\\w.-]+`);
-        patterns.sort((a, b) => b.length - a.length);
+        if (patterns.length === 0) return <>{text}</>;
 
+        patterns.sort((a, b) => b.length - a.length);
         const regex = new RegExp(`(${patterns.join('|')})`, 'g');
         const parts = text.split(regex);
 
         return parts.map((part, index) => {
             const collaborator = (collaborators || []).find(c => c.name === part);
-
             if (collaborator) {
                 return (
                     <Link
                         key={index}
-                        href={`/dashboard/profile/${collaborator.username}`}
+                        href={`/dashboard/profile/${collaborator.user_id}`}
                         className="text-purple-400 font-bold hover:underline cursor-pointer"
                     >
                         {part}
                     </Link>
                 );
             }
-
-            if (part.startsWith('@')) {
-                const username = part.substring(1);
-                return (
-                    <Link
-                        key={index}
-                        href={`/dashboard/profile/${username}`}
-                        className="text-purple-400 font-bold hover:underline cursor-pointer"
-                    >
-                        {part}
-                    </Link>
-                );
-            }
-
             return <React.Fragment key={index}>{part}</React.Fragment>;
         });
     };
@@ -333,6 +360,19 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                         </div>
                     )}
                     <form onSubmit={handleSubmit} className="relative">
+                        {/* Mention chips: visual preview of inserted mentions */}
+                        {mentionedUsers.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                                {mentionedUsers.map((u, i) => (
+                                    <span
+                                        key={i}
+                                        className="inline-flex items-center gap-1 bg-purple-500/20 text-purple-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-purple-500/30"
+                                    >
+                                        @{u.name}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                         <input
                             type="text"
                             placeholder="Write a comment... (@mention)"

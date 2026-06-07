@@ -1,16 +1,7 @@
-import { Query, ID } from "node-appwrite";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 export class AssetRepository {
-    private databases: any;
-    private databaseId: string;
-    private collectionAssetsId: string;
-
-    constructor(databases: any) {
-        this.databases = databases;
-        this.databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
-        this.collectionAssetsId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!;
-    }
+    constructor() {}
 
 
     async getCollaboratorProjects(userId: string) {

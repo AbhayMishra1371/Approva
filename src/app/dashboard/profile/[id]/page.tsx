@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
     User,
     Mail,
@@ -19,14 +19,15 @@ import {
     ArrowLeft
 } from "lucide-react";
 import { getUser, updateName, getJwt } from "@/lib/auth/auth";
-import { getProfileByUsername, getUserAvatarByUsername, getUserActivityByUsername } from "@/lib/supabase/profile";
+import { getProfileByUserId, getProfileByUsername, getUserAvatarByUserId, getUserActivityByUserId } from "@/lib/supabase/profile";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Activity } from "@/types";
 
 export default function DynamicProfilePage() {
     const params = useParams();
-    const username = params?.username as string;
+    const router = useRouter();
+    const id = params?.id as string;
 
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [profileUser, setProfileUser] = useState<any>(null);
@@ -40,12 +41,20 @@ export default function DynamicProfilePage() {
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!id) return;
             setIsLoading(true);
             try {
                 const current = await getUser();
                 setCurrentUser(current);
 
-                const profile = await getProfileByUsername(username);
+                // Check if id is a valid UUID
+                const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
+                let profile = null;
+                if (isUuid) {
+                    profile = await getProfileByUserId(id);
+                } else {
+                    profile = await getProfileByUsername(id);
+                }
 
                 if (!profile) {
                     toast.error("User not found");
@@ -60,12 +69,17 @@ export default function DynamicProfilePage() {
                     setIsOwnProfile(true);
                 }
 
-                const avatar = await getUserAvatarByUsername(username);
+                // If accessed via username instead of UUID, update the path canonically
+                if (!isUuid && profile.id) {
+                    router.replace(`/dashboard/profile/${profile.id}`);
+                }
+
+                const avatar = await getUserAvatarByUserId(profile.id);
                 setUserAvatar(avatar);
 
                 const jwt = await getJwt();
                 if (jwt) {
-                    const activities = await getUserActivityByUsername(profile.id, jwt);
+                    const activities = await getUserActivityByUserId(profile.id, jwt);
                     setActivities(activities);
                 } else {
                     setActivities([]);
@@ -78,10 +92,8 @@ export default function DynamicProfilePage() {
             }
         };
 
-        if (username) {
-            fetchData();
-        }
-    }, [username]);
+        fetchData();
+    }, [id, router]);
 
     const handleSaveName = async () => {
         if (!newName.trim() || !isOwnProfile) return;
@@ -176,7 +188,7 @@ export default function DynamicProfilePage() {
 
     const joinedDate = profileUser.created_at ? formatDate(profileUser.created_at) : "N/A";
     const userRole = profileUser.role || "Member";
-    const userInitial = profileUser.name?.charAt(0).toUpperCase() || username.charAt(0).toUpperCase();
+    const userInitial = (profileUser.name || profileUser.username || "User").charAt(0).toUpperCase();
     const isImageAvatar = typeof userAvatar === 'string' && (userAvatar.startsWith('http') || userAvatar.startsWith('/'));
 
     return (
@@ -187,8 +199,8 @@ export default function DynamicProfilePage() {
                         <h1 className="text-3xl font-bold text-white mb-1 tracking-tight">Your Profile</h1>
                     ) : (
                         <div>
-                            <h1 className="text-3xl font-bold text-white mb-1 tracking-tight">{profileUser.name || username}'s Profile</h1>
-                            <p className="text-slate-400 text-sm">View {profileUser.name || username}'s profile and activity.</p>
+                            <h1 className="text-3xl font-bold text-white mb-1 tracking-tight">{profileUser.name || profileUser.username || "User"}'s Profile</h1>
+                            <p className="text-slate-400 text-sm">View {profileUser.name || profileUser.username || "User"}'s profile and activity.</p>
                         </div>
                     )}
                 </div>
@@ -230,7 +242,7 @@ export default function DynamicProfilePage() {
                                     </div>
                                 ) : (
                                     <div className="flex items-center gap-2 justify-center">
-                                        <h2 className="text-2xl font-bold text-white tracking-tight">{profileUser.name || username}</h2>
+                                        <h2 className="text-2xl font-bold text-white tracking-tight">{profileUser.name || profileUser.username || "User"}</h2>
                                         {isOwnProfile && (
                                             <button
                                                 onClick={() => setIsEditingName(true)}
@@ -244,7 +256,7 @@ export default function DynamicProfilePage() {
                                 )}
                                 <p className="text-slate-400 text-sm flex items-center justify-center gap-2">
                                     <AtSign className="w-3.5 h-3.5 text-slate-500" />
-                                    {profileUser.username || username}
+                                    {profileUser.username || profileUser.email?.split("@")[0] || "user"}
                                 </p>
                                 {profileUser.email && (
                                     <p className="text-slate-400 text-sm flex items-center justify-center gap-2">
@@ -314,7 +326,7 @@ export default function DynamicProfilePage() {
                                             <div className="flex-1 bg-[#1e1f2b]/40 border border-[#2a2b36]/40 p-5 rounded-2xl hover:bg-[#1e1f2b]/80 hover:border-purple-500/20 transition-all group-hover:shadow-lg group-hover:-translate-y-1">
                                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
                                                     <div className="text-sm text-slate-200 leading-relaxed">
-                                                        <span className="text-white font-bold">{profileUser.name || username}</span> {renderActivityDescription(activity)}
+                                                        <span className="text-white font-bold">{profileUser.name || profileUser.username || "User"}</span> {renderActivityDescription(activity)}
                                                     </div>
                                                     <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap bg-[#2a2b36]/50 px-2 py-1 rounded uppercase tracking-wider">
                                                         {activity.project_name}

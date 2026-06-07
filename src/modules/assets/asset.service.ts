@@ -5,8 +5,8 @@ import { createClient as createSupabaseServerClient } from "@/lib/supabase/serve
 export class AssetService {
     private repository: AssetRepository;
 
-    constructor(databases: any) {
-        this.repository = new AssetRepository(databases);
+    constructor() {
+        this.repository = new AssetRepository();
     }
 
     async getAllAssetsForUser(user: UserContext) {

@@ -21,8 +21,6 @@ import {
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { AssetUpload } from "@/components/projects/AssetUpload";
-import { createBrowserClient } from "@/lib/appwrite/client";
-import { Query, Permission, Role, ID } from "appwrite";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { ActivityLog } from "@/components/projects/ActivityLog";
 import { toast } from "sonner";
@@ -256,17 +254,12 @@ export default function ProjectDetailPage() {
         }
     };
 
-    const handleDownload = (filePath: string) => {
+    const handleDownload = (fileUrl: string) => {
+        if (!fileUrl) return;
         try {
-            const { storage } = createBrowserClient();
-            const downloadUrl = storage.getFileDownload(
-                process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
-                filePath
-            ).toString();
-
-            // Create a hidden link and click it to trigger download
             const link = document.createElement('a');
-            link.href = downloadUrl;
+            link.href = fileUrl;
+            link.target = '_blank';
             link.style.display = 'none';
             document.body.appendChild(link);
             link.click();
@@ -437,7 +430,7 @@ export default function ProjectDetailPage() {
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleDownload(asset.file_path);
+                                                            handleDownload(asset.url);
                                                         }}
                                                         className="w-10 h-10 rounded-full bg-slate-500/10 flex items-center justify-center text-slate-400 border border-slate-500/20 hover:bg-slate-500 hover:text-white transition-colors shadow-lg"
                                                         title="Download Asset"
@@ -552,7 +545,7 @@ export default function ProjectDetailPage() {
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        handleDownload(asset.file_path);
+                                                        handleDownload(asset.url);
                                                     }}
                                                     className="w-10 h-10 rounded-full bg-slate-500/10 flex items-center justify-center text-slate-400 border border-slate-500/20 hover:bg-slate-500 hover:text-white transition-colors shadow-lg"
                                                     title="Download Asset"

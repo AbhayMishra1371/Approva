@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { getJwt } from "@/lib/auth/auth";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
-import { Query, ID, Permission, Role } from "appwrite";
 import { toast } from "sonner";
 import {
     AlertDialog,

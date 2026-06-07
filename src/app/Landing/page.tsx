@@ -2,7 +2,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBrowserClient } from '@/lib/appwrite/client';
+import { getUser } from '@/lib/auth/auth';
 import { Navbar } from '@/components/sections/Navbar';
 import { Hero } from '@/components/sections/Hero';
 import { TrustedBy } from '@/components/sections/TrustedBy';
@@ -21,8 +21,7 @@ export default function LandingPage() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const { account } = createBrowserClient();
-        const user = await account.get();
+        const user = await getUser();
         if (user) {
           router.push("/dashboard");
         } else {

@@ -70,7 +70,7 @@ export async function POST(
         }
 
         // 3. Update the Asset Document and optionally log it
-        const assetController = new AssetController(null);
+        const assetController = new AssetController();
         const updatedAsset = await assetController.updateAssetStatus(user, projectId, assetId, status, comment);
 
         return NextResponse.json({ success: true, asset: { ...updatedAsset, id: updatedAsset.$id } });

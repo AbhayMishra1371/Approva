@@ -30,13 +30,13 @@ export async function createUserProfile() {
     }
 }
 
-export async function getProfileByUsername(username: string) {
+export async function getProfileByUserId(userId: string) {
     const supabase = createClient();
     try {
         const { data, error } = await supabase
             .from("profiles")
             .select("*")
-            .eq("username", username)
+            .eq("id", userId)
             .single();
 
         if (error) {
@@ -51,10 +51,10 @@ export async function getProfileByUsername(username: string) {
     }
 }
 
-export async function getUserAvatarByUsername(username: string) {
+export async function getUserAvatarByUserId(userId: string) {
     try {
         const supabase = createClient();
-        const profile = await getProfileByUsername(username);
+        const profile = await getProfileByUserId(userId);
 
         if (!profile) {
             return null;
@@ -66,7 +66,7 @@ export async function getUserAvatarByUsername(username: string) {
         }
 
         // If no avatar, return the initial letter of the name
-        const userName = profile.name || username;
+        const userName = profile.name || userId;
         const initialLetter = userName.charAt(0).toUpperCase();
 
         return initialLetter;
@@ -76,7 +76,7 @@ export async function getUserAvatarByUsername(username: string) {
     }
 }
 
-export async function getUserActivityByUsername(userId: string, jwtToken?: string) {
+export async function getUserActivityByUserId(userId: string, jwtToken?: string) {
     try {
         const headers: any = {};
         if (jwtToken) {
@@ -98,3 +98,25 @@ export async function getUserActivityByUsername(userId: string, jwtToken?: strin
         return [];
     }
 }
+
+export async function getProfileByUsername(username: string) {
+    const supabase = createClient();
+    try {
+        const { data, error } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("username", username)
+            .single();
+
+        if (error) {
+            console.log("Profile fetch by username error:", error);
+            return null;
+        }
+
+        return data;
+    } catch (error) {
+        console.log("Error fetching profile by username:", error);
+        return null;
+    }
+}
+

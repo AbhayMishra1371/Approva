@@ -19,9 +19,7 @@ import {
     X
 } from "lucide-react";
 import { AssetUpload } from "@/components/projects/AssetUpload";
-import { createBrowserClient } from "@/lib/appwrite/client";
 import { getJwt } from "@/lib/auth/auth";
-import { Query, ID, Permission, Role } from "appwrite";
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { AnnotationCanvas, Annotation } from "@/components/projects/AnnotationCanvas";
@@ -61,6 +59,7 @@ export type GeneralComment = {
     user_email: string;
     text: string;
     created_at: string;
+    mentions?: string[];
     profiles?: {
         name: string;
         avatar_url: string | null;
@@ -96,6 +95,8 @@ export default function AssetDetailPage() {
     const [generalMentionSearch, setGeneralMentionSearch] = useState("");
     const [generalMentionIndex, setGeneralMentionIndex] = useState(-1);
     const [generalMentionedUserIds, setGeneralMentionedUserIds] = useState<string[]>([]);
+    // Map of display-name -> userId for mentions inserted in this general comment
+    const [generalMentionedUsers, setGeneralMentionedUsers] = useState<Array<{ name: string; userId: string }>>([]);
 
     // Versions State
     const [versions, setVersions] = useState<Asset[]>([]);
@@ -197,6 +198,7 @@ export default function AssetDetailPage() {
                         user_email: doc.user_email,
                         text: doc.text,
                         created_at: doc.created_at,
+                        mentions: doc.mentions || [],
                         profiles: doc.profiles
                     })));
                 } catch (e) {
@@ -281,6 +283,7 @@ export default function AssetDetailPage() {
                 user_email: doc.user_email,
                 text: doc.text,
                 created_at: doc.created_at,
+                mentions: doc.mentions || [],
                 profiles: doc.profiles
             })));
         } catch (e) {
@@ -288,7 +291,7 @@ export default function AssetDetailPage() {
             setComments([]);
         }
     };
- 
+
     const handleAddAnnotation = async (newAnn: Omit<Annotation, 'created_at' | 'status'>) => {
         try {
             const { data: doc, error: insertErr } = await supabase
@@ -315,11 +318,11 @@ export default function AssetDetailPage() {
                 status: 'pending',
                 created_at: doc.created_at
             };
- 
+
             setAnnotations([...annotations, added]);
             setSelectedAnnotation(added);
             setComments([]); // New annotation has no comments
- 
+
             // Create Activity Log
             try {
                 await supabase
@@ -347,11 +350,11 @@ export default function AssetDetailPage() {
             toast.error(`Failed to save annotation: ${error?.message || "Unknown error"}`);
         }
     };
- 
- 
+
+
     const handleAddComment = async (text: string, mentions?: string[]) => {
         if (!selectedAnnotation?.$id) return;
- 
+
         try {
             const { data: doc, error: insertErr } = await supabase
                 .from("comments")
@@ -372,7 +375,7 @@ export default function AssetDetailPage() {
                 .single();
 
             if (insertErr) throw insertErr;
- 
+
             setComments([...comments, {
                 $id: doc.id,
                 user_id: currentUserId,
@@ -382,7 +385,7 @@ export default function AssetDetailPage() {
                 mentions: mentions || [],
                 profiles: doc.profiles
             } as any]);
- 
+
             // Create Activity Log
             try {
                 await supabase
@@ -399,8 +402,8 @@ export default function AssetDetailPage() {
             } catch (logError) {
                 console.error("Failed to log comment activity:", logError);
             }
- 
- 
+
+
         } catch (e: any) {
             console.error("Failed to save comment in Supabase:", {
                 message: e?.message,
@@ -412,10 +415,10 @@ export default function AssetDetailPage() {
             toast.error(`Failed to save comment: ${e?.message || "Unknown error"}`);
         }
     };
- 
+
     const handleResolve = async () => {
         if (!selectedAnnotation?.$id) return;
- 
+
         try {
             const { error: updateErr } = await supabase
                 .from("annotations")
@@ -423,7 +426,7 @@ export default function AssetDetailPage() {
                 .eq("id", selectedAnnotation.$id);
 
             if (updateErr) throw updateErr;
- 
+
             // Create Activity Log
             try {
                 await supabase
@@ -443,9 +446,9 @@ export default function AssetDetailPage() {
             } catch (logError) {
                 console.error("Failed to log resolve activity:", logError);
             }
- 
- 
- 
+
+
+
             setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
             setSelectedAnnotation(null);
             setComments([]);
@@ -461,10 +464,10 @@ export default function AssetDetailPage() {
             toast.error(`Failed to approve annotation: ${e?.message || "Unknown error"}`);
         }
     };
- 
+
     const handleDeleteAnnotation = async () => {
         if (!selectedAnnotation?.$id) return;
- 
+
         try {
             const { error: deleteErr } = await supabase
                 .from("annotations")
@@ -472,7 +475,7 @@ export default function AssetDetailPage() {
                 .eq("id", selectedAnnotation.$id);
 
             if (deleteErr) throw deleteErr;
- 
+
             setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
             setSelectedAnnotation(null);
             setComments([]); // Clear comments
@@ -488,7 +491,7 @@ export default function AssetDetailPage() {
             toast.error(`Failed to delete annotation: ${e?.message || "Unknown error"}`);
         }
     };
- 
+
     const handleDeleteComment = async (commentId: string) => {
         try {
             const { error: deleteErr } = await supabase
@@ -497,7 +500,7 @@ export default function AssetDetailPage() {
                 .eq("id", commentId);
 
             if (deleteErr) throw deleteErr;
- 
+
             setComments(comments.filter(c => c.$id !== commentId));
             toast.success("Comment deleted successfully");
         } catch (e: any) {
@@ -511,11 +514,17 @@ export default function AssetDetailPage() {
             toast.error(`Failed to delete comment: ${e?.message || "Unknown error"}`);
         }
     };
- 
+
     const handleSendGeneralComment = async () => {
         if (!newGeneralComment.trim()) return;
         setIsSubmittingGeneralComment(true);
- 
+
+        // Convert display names to @[Name](UUID) storage format before saving
+        let submitText = newGeneralComment.trim();
+        generalMentionedUsers.forEach(({ name, userId }) => {
+            submitText = submitText.replace(name, `@[${name}](${userId})`);
+        });
+
         try {
             const { data: doc, error: insertErr } = await supabase
                 .from("general_comments")
@@ -523,7 +532,7 @@ export default function AssetDetailPage() {
                     asset_id: assetId,
                     user_id: currentUserId,
                     user_email: userEmail,
-                    text: newGeneralComment.trim(),
+                    text: submitText,
                     mentions: generalMentionedUserIds
                 })
                 .select(`
@@ -536,21 +545,22 @@ export default function AssetDetailPage() {
                 .single();
 
             if (insertErr) throw insertErr;
- 
+
             setGeneralComments([...generalComments, {
                 $id: doc.id,
                 user_id: currentUserId,
                 user_email: userEmail,
-                text: newGeneralComment.trim(),
+                text: submitText,
                 created_at: doc.created_at,
                 mentions: generalMentionedUserIds,
                 profiles: doc.profiles
             } as any]);
- 
- 
- 
+
+
+
             setNewGeneralComment("");
             setGeneralMentionedUserIds([]);
+            setGeneralMentionedUsers([]);
         } catch (error: any) {
             console.error("Failed to save general comment in Supabase:", {
                 message: error?.message,
@@ -586,12 +596,15 @@ export default function AssetDetailPage() {
     const insertGeneralMention = (user: any) => {
         const beforeMention = newGeneralComment.substring(0, generalMentionIndex);
         const afterMention = newGeneralComment.substring(generalMentionIndex + generalMentionSearch.length + 1);
+        // Show just the name in the textarea
         const updatedComment = `${beforeMention}${user.name} ${afterMention}`;
         setNewGeneralComment(updatedComment);
         setShowGeneralMentions(false);
         if (!generalMentionedUserIds.includes(user.user_id)) {
             setGeneralMentionedUserIds([...generalMentionedUserIds, user.user_id]);
         }
+        // Track name -> userId mapping for submit conversion
+        setGeneralMentionedUsers(prev => [...prev, { name: user.name, userId: user.user_id }]);
     };
 
     const filteredGeneralCollaborators = collaborators.filter(c => {
@@ -601,15 +614,47 @@ export default function AssetDetailPage() {
         return matchesUsername || matchesName;
     });
 
-    const renderGeneralCommentText = (text: string) => {
+    const renderGeneralCommentText = (text: string, mentions: string[] = []) => {
         if (!text) return "";
 
+        // Handle @[Name](userId) format (stored by insertGeneralMention)
+        const markdownMentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+        if (markdownMentionRegex.test(text)) {
+            // Reset lastIndex after test
+            markdownMentionRegex.lastIndex = 0;
+            const segments: React.ReactNode[] = [];
+            let lastIdx = 0;
+            let match;
+            while ((match = markdownMentionRegex.exec(text)) !== null) {
+                if (match.index > lastIdx) {
+                    segments.push(<React.Fragment key={lastIdx}>{text.slice(lastIdx, match.index)}</React.Fragment>);
+                }
+                const displayName = match[1];
+                const userId = match[2];
+                segments.push(
+                    <Link
+                        key={match.index}
+                        href={`/dashboard/profile/${userId}`}
+                        className="text-purple-400 font-bold hover:underline cursor-pointer"
+                    >
+                        {displayName}
+                    </Link>
+                );
+                lastIdx = match.index + match[0].length;
+            }
+            if (lastIdx < text.length) {
+                segments.push(<React.Fragment key={lastIdx}>{text.slice(lastIdx)}</React.Fragment>);
+            }
+            return segments;
+        }
+
+        // Fallback: handle legacy @Name and @username formats
         const escapeRegExp = (str: string) => {
             return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         };
 
         const patterns = (collaborators || [])
-            .map(c => c.name)
+            .map(c => c.name ? `@${c.name}` : '')
             .filter(Boolean)
             .map(name => escapeRegExp(name));
 
@@ -619,32 +664,39 @@ export default function AssetDetailPage() {
         const regex = new RegExp(`(${patterns.join('|')})`, 'g');
         const parts = text.split(regex);
 
+        let mentionIdx = 0;
+
         return parts.map((part, index) => {
-            const collaborator = (collaborators || []).find(c => c.name === part);
+            const isNameMention = (collaborators || []).some(c => `@${c.name}` === part);
+            const isUsernameMention = part.startsWith('@');
 
-            if (collaborator) {
-                return (
-                    <Link
-                        key={index}
-                        href={`/dashboard/profile/${collaborator.username}`}
-                        className="text-purple-400 font-medium font-bold hover:underline cursor-pointer"
-                    >
-                        {part}
-                    </Link>
-                );
-            }
+            if (isNameMention || isUsernameMention) {
+                let profileId = mentions[mentionIdx];
+                mentionIdx++;
 
-            if (part.startsWith('@')) {
-                const username = part.substring(1);
-                return (
-                    <Link
-                        key={index}
-                        href={`/dashboard/profile/${username}`}
-                        className="text-purple-400 font-medium font-bold hover:underline cursor-pointer"
-                    >
-                        {part}
-                    </Link>
-                );
+                if (!profileId) {
+                    if (isNameMention) {
+                        const name = part.substring(1);
+                        const collaborator = (collaborators || []).find(c => c.name === name);
+                        profileId = collaborator?.user_id || "";
+                    } else {
+                        const username = part.substring(1);
+                        const collaborator = (collaborators || []).find(c => c.username === username);
+                        profileId = collaborator?.user_id || username;
+                    }
+                }
+
+                if (profileId) {
+                    return (
+                        <Link
+                            key={index}
+                            href={`/dashboard/profile/${profileId}`}
+                            className="text-purple-400 font-medium font-bold hover:underline cursor-pointer"
+                        >
+                            {part}
+                        </Link>
+                    );
+                }
             }
 
             return <React.Fragment key={index}>{part}</React.Fragment>;
@@ -726,7 +778,7 @@ export default function AssetDetailPage() {
     };
 
 
-     const handleDownload = async (filePath: string) => {
+    const handleDownload = async (filePath: string) => {
         try {
             const supabase = createSupabaseClient();
             const { data, error } = await supabase.storage
@@ -989,7 +1041,7 @@ export default function AssetDetailPage() {
                                             profiles: any;
                                             comments: GeneralComment[];
                                         }> = [];
-                                        
+
                                         generalComments.forEach(comment => {
                                             const lastGroup = grouped[grouped.length - 1];
                                             if (lastGroup && lastGroup.user_id === comment.user_id) {
@@ -1029,7 +1081,7 @@ export default function AssetDetailPage() {
                                                 </div>
                                                 <div className="space-y-2 ml-8">
                                                     {group.comments.map(c => (
-                                                        <p key={c.$id} className="text-xs text-slate-300 whitespace-pre-wrap">{renderGeneralCommentText(c.text)}</p>
+                                                        <p key={c.$id} className="text-xs text-slate-300 whitespace-pre-wrap">{renderGeneralCommentText(c.text, c.mentions)}</p>
                                                     ))}
                                                 </div>
                                             </div>
@@ -1069,6 +1121,19 @@ export default function AssetDetailPage() {
                                             </div>
                                         )}
                                         <div className="relative bg-[#12131a] border border-[#2a2b36] rounded-xl focus-within:border-purple-500 transition-colors">
+                                            {/* Mention chips: visual preview of inserted mentions */}
+                                            {generalMentionedUsers.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 px-3 pt-3 pb-0">
+                                                    {generalMentionedUsers.map((u, i) => (
+                                                        <span
+                                                            key={i}
+                                                            className="inline-flex items-center gap-1 bg-purple-500/20 text-purple-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-purple-500/30"
+                                                        >
+                                                            @{u.name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                             <textarea
                                                 value={newGeneralComment}
                                                 onChange={handleGeneralInputChange}

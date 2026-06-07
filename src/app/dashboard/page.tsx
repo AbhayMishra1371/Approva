@@ -14,8 +14,6 @@ import {
     UserPlus,
 } from "lucide-react";
 import CountUp from "@/components/CountUp";
-import { createBrowserClient } from "@/lib/appwrite/client";
-import { Query } from "appwrite";
 import { toast } from "sonner";
 import { getUser, logout, getJwt } from "@/lib/auth/auth";
 import {
@@ -104,8 +102,7 @@ export default function DashboardPage() {
         const fetchDashboardData = async () => {
             setIsLoading(true);
             try {
-                const { account } = createBrowserClient();
-                const user = await account.get().catch(() => null);
+                const user = await getUser();
                 if (!user?.email) return;
 
                 // Use hardened getJwt helper

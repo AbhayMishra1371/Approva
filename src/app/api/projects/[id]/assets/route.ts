@@ -129,7 +129,7 @@ export async function POST(
 
         // Pass the request data to the new service
         // The service will handle versioning and thumbnail generation
-        const assetController = new AssetController(null);
+        const assetController = new AssetController();
         const asset = await assetController.createAsset(user, projectId, json);
 
         return NextResponse.json(asset);

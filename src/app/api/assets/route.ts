@@ -11,7 +11,7 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const assetController = new AssetController(null);
+        const assetController = new AssetController();
 
         const formattedAssets = await assetController.getAllAssetsForUser(user);
 
