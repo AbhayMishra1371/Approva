@@ -20,7 +20,9 @@ import {
 } from "lucide-react";
 import { AssetUpload } from "@/components/projects/AssetUpload";
 import { createBrowserClient } from "@/lib/appwrite/client";
+import { getJwt } from "@/lib/auth/auth";
 import { Query, ID, Permission, Role } from "appwrite";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { AnnotationCanvas, Annotation } from "@/components/projects/AnnotationCanvas";
 
@@ -59,6 +61,10 @@ export type GeneralComment = {
     user_email: string;
     text: string;
     created_at: string;
+    profiles?: {
+        name: string;
+        avatar_url: string | null;
+    } | null;
 };
 
 export default function AssetDetailPage() {
@@ -66,6 +72,7 @@ export default function AssetDetailPage() {
     const router = useRouter();
     const projectId = params.id as string;
     const assetId = params.assetId as string;
+    const supabase = createSupabaseClient();
 
     const [asset, setAsset] = useState<Asset | null>(null);
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
@@ -74,6 +81,7 @@ export default function AssetDetailPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [userEmail, setUserEmail] = useState<string>("");
     const [currentUserId, setCurrentUserId] = useState<string>("");
+    const [currentUserProfile, setCurrentUserProfile] = useState<{ name: string; avatar_url: string | null } | null>(null);
     const [currentColor, setCurrentColor] = useState("#a855f7");
     const [activeSidebarTab, setActiveSidebarTab] = useState<'comments' | 'fields'>('comments');
 
@@ -110,86 +118,102 @@ export default function AssetDetailPage() {
         { name: 'Amber', value: '#f59e0b' },
         { name: 'Rose', value: '#f43f5e' }
     ];
-
-    // Appwrite Collection IDs (Fallback to standard names if not in env)
-    const annotationsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ANNOTATIONS_ID || 'annotations';
-    const commentsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COMMENTS_ID || 'comments';
-    const generalCommentsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_GENERAL_COMMENTS_ID || 'general_comments';
-
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const { databases, account } = createBrowserClient();
+                // Fetch User from Supabase
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    setUserEmail(user.email || "");
+                    setCurrentUserId(user.id);
 
-                // Fetch User
-                const user = await account.get();
-                setUserEmail(user.email);
-                setCurrentUserId(user.$id);
-
-                // Fetch Asset
-                const assetDoc = await databases.getDocument(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-                    assetId
-                );
-                setAsset({ ...assetDoc as any, id: assetDoc.$id });
-
-                // Fetch Annotations
-                try {
-                    const annDocs = await databases.listDocuments(
-                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                        annotationsCollectionId,
-                        [Query.equal("asset_id", assetId)]
-                    );
-                    setAnnotations(annDocs.documents
-                        .filter(doc => doc.status !== 'resolved')
-                        .map(doc => ({
-                            $id: doc.$id,
-                            x: doc.x,
-                            y: doc.y,
-                            width: doc.width,
-                            height: doc.height,
-                            status: doc.status,
-                            name: doc.name || undefined,
-                            color: doc.color || '#a855f7',
-                            user_id: doc.user_id,
-                            created_at: doc.$createdAt
-                        })));
-                } catch (e) {
-                    console.warn("Annotations collection might not exist yet. Please create it in Appwrite console.", e);
+                    // Fetch current user's profile
+                    const { data: profile } = await supabase
+                        .from("profiles")
+                        .select("name, avatar_url")
+                        .eq("id", user.id)
+                        .single();
+                    if (profile) {
+                        setCurrentUserProfile(profile);
+                    }
                 }
 
-                // Fetch General Comments
+                // Fetch Asset
+                const { data: assetDoc, error: assetErr } = await supabase
+                    .from("assets")
+                    .select("*")
+                    .eq("id", assetId)
+                    .single();
+
+                if (assetErr) throw assetErr;
+                setAsset({ ...assetDoc, size: assetDoc.file_size });
+
+                // Fetch Annotations from Supabase
                 try {
-                    const genCommDocs = await databases.listDocuments(
-                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                        generalCommentsCollectionId,
-                        [Query.equal("asset_id", assetId), Query.orderAsc("$createdAt")]
-                    );
-                    setGeneralComments(genCommDocs.documents.map(doc => ({
-                        $id: doc.$id,
+                    const { data: annDocs, error: annErr } = await supabase
+                        .from("annotations")
+                        .select("*")
+                        .eq("asset_id", assetId)
+                        .neq("status", "resolved");
+
+                    if (annErr) throw annErr;
+
+                    setAnnotations((annDocs || []).map(doc => ({
+                        $id: doc.id,
+                        x: Number(doc.x),
+                        y: Number(doc.y),
+                        width: Number(doc.width),
+                        height: Number(doc.height),
+                        status: doc.status,
+                        name: doc.name || undefined,
+                        color: doc.color || '#a855f7',
+                        user_id: doc.user_id,
+                        created_at: doc.created_at
+                    })));
+                } catch (e) {
+                    console.error("Error fetching annotations from Supabase:", e);
+                }
+
+                // Fetch General Comments from Supabase
+                try {
+                    const { data: genCommDocs, error: genCommErr } = await supabase
+                        .from("general_comments")
+                        .select(`
+                            *,
+                            profiles (
+                                name,
+                                avatar_url
+                            )
+                        `)
+                        .eq("asset_id", assetId)
+                        .order("created_at", { ascending: true });
+
+                    if (genCommErr) throw genCommErr;
+
+                    setGeneralComments((genCommDocs || []).map(doc => ({
+                        $id: doc.id,
                         user_id: doc.user_id,
                         user_email: doc.user_email,
                         text: doc.text,
-                        created_at: doc.$createdAt
+                        created_at: doc.created_at,
+                        profiles: doc.profiles
                     })));
                 } catch (e) {
-                    console.warn("General comments collection might not exist yet.", e);
+                    console.error("Error fetching general comments from Supabase:", e);
                 }
 
                 // Fetch Versions if they exist
                 if (assetDoc.asset_group_id) {
                     try {
-                        const versionDocs = await databases.listDocuments(
-                            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-                            [
-                                Query.equal("asset_group_id", assetDoc.asset_group_id),
-                                Query.orderDesc("version")
-                            ]
-                        );
-                        setVersions(versionDocs.documents.map(doc => ({ ...doc as any, id: doc.$id })));
+                        const { data: versionDocs, error: versionErr } = await supabase
+                            .from("assets")
+                            .select("*")
+                            .eq("asset_group_id", assetDoc.asset_group_id)
+                            .order("version", { ascending: false });
+
+                        if (versionErr) throw versionErr;
+                        setVersions((versionDocs || []).map((doc: any) => ({ ...doc, id: doc.id, size: doc.file_size })));
                     } catch (e) {
                         console.error("Error fetching versions:", e);
                     }
@@ -203,13 +227,12 @@ export default function AssetDetailPage() {
         };
 
         fetchData();
-    }, [assetId, annotationsCollectionId]);
+    }, [assetId]);
 
     useEffect(() => {
         const fetchRole = async () => {
             try {
-                const { account } = createBrowserClient();
-                const { jwt } = await account.createJWT();
+                const jwt = await getJwt();
                 const res = await fetch(`/api/projects/collaborators?projectId=${projectId}`, {
                     headers: { "Authorization": `Bearer ${jwt}` }
                 });
@@ -238,35 +261,39 @@ export default function AssetDetailPage() {
 
     const fetchComments = async (annotationId: string) => {
         try {
-            const { databases } = createBrowserClient();
-            const commentDocs = await databases.listDocuments(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                commentsCollectionId,
-                [Query.equal("annotation_id", annotationId), Query.orderAsc("$createdAt")]
-            );
-            setComments(commentDocs.documents.map(doc => ({
-                $id: doc.$id,
+            const { data: commentDocs, error: commentErr } = await supabase
+                .from("comments")
+                .select(`
+                    *,
+                    profiles (
+                        name,
+                        avatar_url
+                    )
+                `)
+                .eq("annotation_id", annotationId)
+                .order("created_at", { ascending: true });
+
+            if (commentErr) throw commentErr;
+
+            setComments((commentDocs || []).map(doc => ({
+                $id: doc.id,
                 user_id: doc.user_id,
                 user_email: doc.user_email,
                 text: doc.text,
-                created_at: doc.$createdAt
+                created_at: doc.created_at,
+                profiles: doc.profiles
             })));
         } catch (e) {
-            console.warn("Comments collection might not exist yet.", e);
+            console.error("Error fetching comments from Supabase:", e);
             setComments([]);
         }
     };
-
+ 
     const handleAddAnnotation = async (newAnn: Omit<Annotation, 'created_at' | 'status'>) => {
         try {
-            const { databases } = createBrowserClient();
-
-            // Immediately save the annotation to Appwrite
-            const doc = await databases.createDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                annotationsCollectionId,
-                ID.unique(),
-                {
+            const { data: doc, error: insertErr } = await supabase
+                .from("annotations")
+                .insert({
                     asset_id: assetId,
                     name: newAnn.name || undefined,
                     x: newAnn.x,
@@ -276,138 +303,135 @@ export default function AssetDetailPage() {
                     status: 'pending',
                     color: newAnn.color,
                     user_id: currentUserId
-                }
-            );
+                })
+                .select()
+                .single();
+
+            if (insertErr) throw insertErr;
 
             const added: Annotation = {
-                $id: doc.$id,
+                $id: doc.id,
                 ...newAnn,
                 status: 'pending',
-                created_at: doc.$createdAt
+                created_at: doc.created_at
             };
-
+ 
             setAnnotations([...annotations, added]);
             setSelectedAnnotation(added);
             setComments([]); // New annotation has no comments
-
+ 
             // Create Activity Log
             try {
-                const { account } = createBrowserClient();
-                const user = await account.get();
-                await databases.createDocument(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
-                    ID.unique(),
-                    {
+                await supabase
+                    .from("activity_logs")
+                    .insert({
                         project_id: projectId,
-                        user_id: user.$id,
-                        user_email: user.email,
+                        user_id: currentUserId,
+                        user_email: userEmail,
                         action: "added_annotation",
                         entity_type: "annotation",
-                        entity_id: doc.$id,
+                        entity_id: doc.id,
                         metadata: JSON.stringify({ file_name: asset?.file_name })
-                    },
-                    [
-                        Permission.read(Role.users()),
-                        Permission.update(Role.user(user.$id)),
-                        Permission.delete(Role.user(user.$id))
-                    ]
-                );
+                    });
             } catch (logError) {
                 console.error("Failed to log annotation activity:", logError);
             }
-        } catch (error) {
-            console.error("Failed to save annotation:", error);
-            toast.error("Failed to save annotation. Make sure the 'annotations' collection exists.");
+        } catch (error: any) {
+            console.error("Failed to save annotation in Supabase:", {
+                message: error?.message,
+                details: error?.details,
+                hint: error?.hint,
+                code: error?.code,
+                error
+            });
+            toast.error(`Failed to save annotation: ${error?.message || "Unknown error"}`);
         }
     };
-
-
+ 
+ 
     const handleAddComment = async (text: string, mentions?: string[]) => {
         if (!selectedAnnotation?.$id) return;
-
+ 
         try {
-            const { databases, account } = createBrowserClient();
-            const user = await account.get();
-
-            const doc = await databases.createDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                commentsCollectionId,
-                ID.unique(),
-                {
+            const { data: doc, error: insertErr } = await supabase
+                .from("comments")
+                .insert({
                     annotation_id: selectedAnnotation.$id,
-                    user_id: user.$id,
-                    user_email: user.email,
+                    user_id: currentUserId,
+                    user_email: userEmail,
                     text: text,
-                    mentions: JSON.stringify(mentions || [])
-                }
-            );
+                    mentions: mentions || []
+                })
+                .select(`
+                    *,
+                    profiles (
+                        name,
+                        avatar_url
+                    )
+                `)
+                .single();
 
+            if (insertErr) throw insertErr;
+ 
             setComments([...comments, {
-                $id: doc.$id,
-                user_id: user.$id,
-                user_email: user.email,
+                $id: doc.id,
+                user_id: currentUserId,
+                user_email: userEmail,
                 text: text,
-                created_at: new Date().toISOString(),
-                mentions: mentions || []
+                created_at: doc.created_at,
+                mentions: mentions || [],
+                profiles: doc.profiles
             } as any]);
-
+ 
             // Create Activity Log
             try {
-                await databases.createDocument(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
-                    ID.unique(),
-                    {
+                await supabase
+                    .from("activity_logs")
+                    .insert({
                         project_id: projectId,
-                        user_id: user.$id,
-                        user_email: user.email,
+                        user_id: currentUserId,
+                        user_email: userEmail,
                         action: "added_comment",
                         entity_type: "comment",
-                        entity_id: doc.$id,
+                        entity_id: doc.id,
                         metadata: JSON.stringify({ file_name: asset?.file_name })
-                    },
-                    [
-                        Permission.read(Role.users()),
-                        Permission.update(Role.user(user.$id)),
-                        Permission.delete(Role.user(user.$id))
-                    ]
-                );
+                    });
             } catch (logError) {
                 console.error("Failed to log comment activity:", logError);
             }
-
-
-        } catch (e) {
-            console.error("Failed to save comment:", e);
-            toast.error("Failed to save comment.");
+ 
+ 
+        } catch (e: any) {
+            console.error("Failed to save comment in Supabase:", {
+                message: e?.message,
+                details: e?.details,
+                hint: e?.hint,
+                code: e?.code,
+                e
+            });
+            toast.error(`Failed to save comment: ${e?.message || "Unknown error"}`);
         }
     };
-
+ 
     const handleResolve = async () => {
         if (!selectedAnnotation?.$id) return;
-
+ 
         try {
-            const { databases, account } = createBrowserClient();
-            const user = await account.get();
+            const { error: updateErr } = await supabase
+                .from("annotations")
+                .update({ status: 'resolved' })
+                .eq("id", selectedAnnotation.$id);
 
-            await databases.updateDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                annotationsCollectionId,
-                selectedAnnotation.$id,
-                { status: 'resolved' }
-            );
-
+            if (updateErr) throw updateErr;
+ 
             // Create Activity Log
             try {
-                await databases.createDocument(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
-                    ID.unique(),
-                    {
+                await supabase
+                    .from("activity_logs")
+                    .insert({
                         project_id: projectId,
-                        user_id: user.$id,
-                        user_email: user.email,
+                        user_id: currentUserId,
+                        user_email: userEmail,
                         action: "resolved_annotation",
                         entity_type: "annotation",
                         entity_id: selectedAnnotation.$id,
@@ -415,125 +439,127 @@ export default function AssetDetailPage() {
                             file_name: asset?.file_name,
                             annotation_name: selectedAnnotation.name
                         })
-                    },
-                    [
-                        Permission.read(Role.users()),
-                        Permission.update(Role.user(user.$id)),
-                        Permission.delete(Role.user(user.$id))
-                    ]
-                );
+                    });
             } catch (logError) {
                 console.error("Failed to log resolve activity:", logError);
             }
-
-
-
+ 
+ 
+ 
             setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
             setSelectedAnnotation(null);
             setComments([]);
             toast.success("Annotation approved and removed");
-        } catch (e) {
-            console.error("Failed to resolve annotation:", e);
-            toast.error("Failed to approve annotation");
+        } catch (e: any) {
+            console.error("Failed to resolve annotation in Supabase:", {
+                message: e?.message,
+                details: e?.details,
+                hint: e?.hint,
+                code: e?.code,
+                e
+            });
+            toast.error(`Failed to approve annotation: ${e?.message || "Unknown error"}`);
         }
     };
-
+ 
     const handleDeleteAnnotation = async () => {
         if (!selectedAnnotation?.$id) return;
-
+ 
         try {
-            const { databases } = createBrowserClient();
+            const { error: deleteErr } = await supabase
+                .from("annotations")
+                .delete()
+                .eq("id", selectedAnnotation.$id);
 
-            // Delete associated comments first
-            try {
-                const commentDocs = await databases.listDocuments(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    commentsCollectionId,
-                    [Query.equal("annotation_id", selectedAnnotation.$id)]
-                );
-
-                for (const doc of commentDocs.documents) {
-                    await databases.deleteDocument(
-                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                        commentsCollectionId,
-                        doc.$id
-                    );
-                }
-            } catch (e) {
-                console.warn("Failed to delete comments or collection missing", e);
-            }
-
-            // Delete the annotation
-            await databases.deleteDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                annotationsCollectionId,
-                selectedAnnotation.$id
-            );
-
+            if (deleteErr) throw deleteErr;
+ 
             setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
             setSelectedAnnotation(null);
             setComments([]); // Clear comments
             toast.success("Annotation deleted successfully");
-        } catch (e) {
-            console.error("Failed to delete annotation:", e);
-            toast.error("Failed to delete annotation.");
+        } catch (e: any) {
+            console.error("Failed to delete annotation in Supabase:", {
+                message: e?.message,
+                details: e?.details,
+                hint: e?.hint,
+                code: e?.code,
+                e
+            });
+            toast.error(`Failed to delete annotation: ${e?.message || "Unknown error"}`);
         }
     };
-
+ 
     const handleDeleteComment = async (commentId: string) => {
         try {
-            const { databases } = createBrowserClient();
-            await databases.deleteDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                commentsCollectionId,
-                commentId
-            );
+            const { error: deleteErr } = await supabase
+                .from("comments")
+                .delete()
+                .eq("id", commentId);
 
+            if (deleteErr) throw deleteErr;
+ 
             setComments(comments.filter(c => c.$id !== commentId));
             toast.success("Comment deleted successfully");
-        } catch (e) {
-            console.error("Failed to delete comment:", e);
-            toast.error("Failed to delete comment.");
+        } catch (e: any) {
+            console.error("Failed to delete comment in Supabase:", {
+                message: e?.message,
+                details: e?.details,
+                hint: e?.hint,
+                code: e?.code,
+                e
+            });
+            toast.error(`Failed to delete comment: ${e?.message || "Unknown error"}`);
         }
     };
-
+ 
     const handleSendGeneralComment = async () => {
         if (!newGeneralComment.trim()) return;
         setIsSubmittingGeneralComment(true);
-
+ 
         try {
-            const { databases, account } = createBrowserClient();
-            const user = await account.get();
-
-            const doc = await databases.createDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                generalCommentsCollectionId,
-                ID.unique(),
-                {
+            const { data: doc, error: insertErr } = await supabase
+                .from("general_comments")
+                .insert({
                     asset_id: assetId,
-                    user_id: user.$id,
-                    user_email: user.email,
+                    user_id: currentUserId,
+                    user_email: userEmail,
                     text: newGeneralComment.trim(),
-                    mentions: JSON.stringify(generalMentionedUserIds)
-                }
-            );
+                    mentions: generalMentionedUserIds
+                })
+                .select(`
+                    *,
+                    profiles (
+                        name,
+                        avatar_url
+                    )
+                `)
+                .single();
 
+            if (insertErr) throw insertErr;
+ 
             setGeneralComments([...generalComments, {
-                $id: doc.$id,
-                user_id: user.$id,
-                user_email: user.email,
+                $id: doc.id,
+                user_id: currentUserId,
+                user_email: userEmail,
                 text: newGeneralComment.trim(),
-                created_at: new Date().toISOString(),
-                mentions: generalMentionedUserIds
+                created_at: doc.created_at,
+                mentions: generalMentionedUserIds,
+                profiles: doc.profiles
             } as any]);
-
-
-
+ 
+ 
+ 
             setNewGeneralComment("");
             setGeneralMentionedUserIds([]);
-        } catch (error) {
-            console.error("Failed to save general comment:", error);
-            toast.error("Failed to send comment. Ensure the 'general_comments' table is created with attributes 'asset_id', 'user_id', 'user_email', 'text', and 'mentions'.");
+        } catch (error: any) {
+            console.error("Failed to save general comment in Supabase:", {
+                message: error?.message,
+                details: error?.details,
+                hint: error?.hint,
+                code: error?.code,
+                error
+            });
+            toast.error(`Failed to send comment: ${error?.message || "Unknown error"}`);
         } finally {
             setIsSubmittingGeneralComment(false);
         }
@@ -560,7 +586,7 @@ export default function AssetDetailPage() {
     const insertGeneralMention = (user: any) => {
         const beforeMention = newGeneralComment.substring(0, generalMentionIndex);
         const afterMention = newGeneralComment.substring(generalMentionIndex + generalMentionSearch.length + 1);
-        const updatedComment = `${beforeMention}@${user.username || user.name.split(' ')[0]} ${afterMention}`;
+        const updatedComment = `${beforeMention}${user.name} ${afterMention}`;
         setNewGeneralComment(updatedComment);
         setShowGeneralMentions(false);
         if (!generalMentionedUserIds.includes(user.user_id)) {
@@ -576,19 +602,51 @@ export default function AssetDetailPage() {
     });
 
     const renderGeneralCommentText = (text: string) => {
-        const parts = text.split(/(@\w+)/g);
+        if (!text) return "";
+
+        const escapeRegExp = (str: string) => {
+            return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        };
+
+        const patterns = (collaborators || [])
+            .map(c => c.name)
+            .filter(Boolean)
+            .map(name => escapeRegExp(name));
+
+        patterns.push(`@[\\w.-]+`);
+        patterns.sort((a, b) => b.length - a.length);
+
+        const regex = new RegExp(`(${patterns.join('|')})`, 'g');
+        const parts = text.split(regex);
+
         return parts.map((part, index) => {
+            const collaborator = (collaborators || []).find(c => c.name === part);
+
+            if (collaborator) {
+                return (
+                    <Link
+                        key={index}
+                        href={`/dashboard/profile/${collaborator.username}`}
+                        className="text-purple-400 font-medium font-bold hover:underline cursor-pointer"
+                    >
+                        {part}
+                    </Link>
+                );
+            }
+
             if (part.startsWith('@')) {
                 const username = part.substring(1);
                 return (
-                    <span
+                    <Link
                         key={index}
-                        className="text-purple-400 font-medium"
+                        href={`/dashboard/profile/${username}`}
+                        className="text-purple-400 font-medium font-bold hover:underline cursor-pointer"
                     >
                         {part}
-                    </span>
+                    </Link>
                 );
             }
+
             return <React.Fragment key={index}>{part}</React.Fragment>;
         });
     };
@@ -609,8 +667,7 @@ export default function AssetDetailPage() {
     const confirmStatusChange = async (newStatus: string, comment: string) => {
         setIsLoading(true);
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
 
             const res = await fetch(`/api/projects/${projectId}/assets/${assetId}/status`, {
                 method: "POST",
@@ -626,38 +683,29 @@ export default function AssetDetailPage() {
                 setAsset(data.asset);
                 // Optimistically add the generated comment to the UI
                 if (comment) {
-                    const user = await account.get();
                     setGeneralComments([...generalComments, {
                         $id: Date.now().toString(),
-                        user_id: user.$id,
-                        user_email: user.email,
+                        user_id: currentUserId,
+                        user_email: userEmail,
                         text: comment,
-                        created_at: new Date().toISOString()
+                        created_at: new Date().toISOString(),
+                        profiles: currentUserProfile
                     }]);
 
                     // Create Activity Log ONLY if approved
                     if (newStatus === 'approved') {
                         try {
-                            const { databases } = createBrowserClient();
-                            await databases.createDocument(
-                                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
-                                ID.unique(),
-                                {
+                            await supabase
+                                .from("activity_logs")
+                                .insert({
                                     project_id: projectId,
-                                    user_id: user.$id,
-                                    user_email: user.email,
+                                    user_id: currentUserId,
+                                    user_email: userEmail,
                                     action: "approved_asset",
                                     entity_type: "asset",
                                     entity_id: assetId,
                                     metadata: JSON.stringify({ file_name: data.asset?.file_name || asset?.file_name })
-                                },
-                                [
-                                    Permission.read(Role.users()),
-                                    Permission.update(Role.user(user.$id)),
-                                    Permission.delete(Role.user(user.$id))
-                                ]
-                            );
+                                });
                         } catch (logError) {
                             console.error("Failed to log approval activity:", logError);
                         }
@@ -678,20 +726,22 @@ export default function AssetDetailPage() {
     };
 
 
-    const handleDownload = (filePath: string) => {
+     const handleDownload = async (filePath: string) => {
         try {
-            const { storage } = createBrowserClient();
-            const downloadUrl = storage.getFileDownload(
-                process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
-                filePath
-            ).toString();
+            const supabase = createSupabaseClient();
+            const { data, error } = await supabase.storage
+                .from("assets")
+                .download(filePath);
 
+            if (error) throw error;
+
+            const url = window.URL.createObjectURL(data);
             const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.style.display = 'none';
+            link.href = url;
+            link.setAttribute('download', asset?.file_name || 'download');
             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
+            link.remove();
         } catch (error) {
             console.error("Download error:", error);
             toast.error("Failed to start download.");
@@ -932,22 +982,59 @@ export default function AssetDetailPage() {
                                         No general comments yet. Be the first to share your thoughts!
                                     </div>
                                 ) : (
-                                    generalComments.map(comment => (
-                                        <div key={comment.$id} className="bg-[#1f202b] rounded-xl p-3 border border-[#2a2b36]">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 uppercase">
-                                                        {comment.user_email?.[0] || '?'}
+                                    (() => {
+                                        const grouped: Array<{
+                                            user_id: string;
+                                            user_email: string;
+                                            profiles: any;
+                                            comments: GeneralComment[];
+                                        }> = [];
+                                        
+                                        generalComments.forEach(comment => {
+                                            const lastGroup = grouped[grouped.length - 1];
+                                            if (lastGroup && lastGroup.user_id === comment.user_id) {
+                                                lastGroup.comments.push(comment);
+                                            } else {
+                                                grouped.push({
+                                                    user_id: comment.user_id,
+                                                    user_email: comment.user_email,
+                                                    profiles: comment.profiles,
+                                                    comments: [comment]
+                                                });
+                                            }
+                                        });
+
+                                        return grouped.map((group, gIndex) => (
+                                            <div key={gIndex} className="bg-[#1f202b] rounded-xl p-3 border border-[#2a2b36] space-y-3">
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex items-center gap-2">
+                                                        {group.profiles?.avatar_url ? (
+                                                            <img
+                                                                src={group.profiles.avatar_url}
+                                                                alt={group.profiles.name || 'Avatar'}
+                                                                className="w-6 h-6 rounded-full object-cover shrink-0"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 uppercase">
+                                                                {(group.profiles?.name || group.user_email)?.[0] || '?'}
+                                                            </div>
+                                                        )}
+                                                        <span className="text-xs font-bold text-white">
+                                                            {group.profiles?.name || group.user_email?.split('@')[0] || 'Unknown User'}
+                                                        </span>
                                                     </div>
-                                                    <span className="text-xs font-bold text-white">{comment.user_email?.split('@')[0] || 'Unknown User'}</span>
+                                                    <span className="text-[10px] text-slate-500 mt-0.5">
+                                                        {new Date(group.comments[0].created_at).toLocaleDateString()}
+                                                    </span>
                                                 </div>
-                                                <span className="text-[10px] text-slate-500 mt-0.5">
-                                                    {new Date(comment.created_at).toLocaleDateString()}
-                                                </span>
+                                                <div className="space-y-2 ml-8">
+                                                    {group.comments.map(c => (
+                                                        <p key={c.$id} className="text-xs text-slate-300 whitespace-pre-wrap">{renderGeneralCommentText(c.text)}</p>
+                                                    ))}
+                                                </div>
                                             </div>
-                                            <p className="text-xs text-slate-300 whitespace-pre-wrap ml-8">{renderGeneralCommentText(comment.text)}</p>
-                                        </div>
-                                    ))
+                                        ));
+                                    })()
                                 )}
                             </div>
 

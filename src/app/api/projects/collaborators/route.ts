@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getLoggedInUser, createAdminClient } from "@/lib/appwrite/server";
-import { ID, Query } from "node-appwrite";
+import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+
 import nodemailer from "nodemailer";
 import { render } from "@react-email/render";
 import ProjectInviteEmail from "@/emails/ProjectInviteEmail";
@@ -26,7 +26,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { databases } = await createAdminClient();
     const { projectId, email, role } = await request.json();
 
     if (!projectId || !email || !role) {
@@ -43,25 +42,34 @@ export async function POST(request: Request) {
       );
     }
 
-    /* Ensure caller is collaborator */
-    const allAccess = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-      [
-        Query.equal("project_id", projectId),
-      ]
-    );
+    const supabase = await createSupabaseServerClient();
 
-    const callerDoc = allAccess.documents.find((doc: any) => doc.user_id === user.$id);
+    /* Fetch project details and check caller access */
+    const { data: project, error: projectError } = await supabase
+      .from("projects")
+      .select("name, owner_id")
+      .eq("id", projectId)
+      .single();
 
-    if (!callerDoc) {
-      return NextResponse.json(
-        { error: "Unauthorized access to project" },
-        { status: 403 }
-      );
+    if (projectError || !project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const callerRole = callerDoc.role;
+    let callerRole = "";
+    if (project.owner_id === user.$id) {
+      callerRole = "owner";
+    } else {
+      const { data: collab } = await supabase
+        .from("project_collaborators")
+        .select("role")
+        .eq("project_id", projectId)
+        .eq("user_id", user.$id)
+        .maybeSingle();
+
+      if (collab) {
+        callerRole = collab.role === 'member' ? 'viewer' : collab.role;
+      }
+    }
 
     if (callerRole !== "owner" && callerRole !== "admin") {
       return NextResponse.json(
@@ -71,63 +79,48 @@ export async function POST(request: Request) {
     }
 
     /* Prevent duplicate invites */
-    const existingInvite = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID!,
-      [
-        Query.equal("project_id", projectId),
-        Query.equal("email", email),
-      ]
-    );
+    const { data: existingInvite, error: existingInviteErr } = await supabase
+      .from("project_invites")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("email", email)
+      .eq("status", "pending");
 
-    if (existingInvite.total > 0) {
+    if (!existingInviteErr && existingInvite && existingInvite.length > 0) {
       return NextResponse.json(
         { error: "Invite already sent to this email." },
         { status: 409 }
       );
     }
 
-    /* Fetch project details for email */
-    const project = await databases.getDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-      projectId
-    );
-
     /* Create invite in DB */
     const inviteToken = uuidv4();
-    const invite = await databases.createDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID!,
-      ID.unique(),
-      {
+    const { data: invite, error: inviteErr } = await supabase
+      .from("project_invites")
+      .insert({
         project_id: projectId,
         email,
         role,
         token: inviteToken,
         status: "pending",
-        invited_at: new Date().toISOString(),
-      }
-    );
+        invited_by: user.$id
+      })
+      .select()
+      .single();
+
+    if (inviteErr || !invite) {
+      return NextResponse.json({ error: "Failed to create invitation in Supabase" }, { status: 500 });
+    }
 
     /* Send email via Nodemailer */
     if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
       try {
-
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000";
         const inviteLink = `${baseUrl}/invite?token=${inviteToken}`;
 
-        let targetEmail = email;
-        const testMatch = email.match(/\+(.*?)@/);
-        if (process.env.SMTP_USER === "test@example.com") {
-
-        }
-
-        // Add verification to check if SMTP connection works before trying to send
         try {
           await transporter.verify();
           console.log("SMTP Connection verified successfully");
-
         } catch (verifyError) {
           console.error("SMTP Connection Failed. Please check your .env.local credentials:", verifyError);
           throw verifyError;
@@ -151,10 +144,6 @@ export async function POST(request: Request) {
         });
 
         console.log("Email sent successfully! Message ID:", info.messageId);
-        console.log("Accepted domains:", info.accepted);
-        console.log("Rejected domains:", info.rejected);
-
-
       } catch (err: any) {
         console.error("Email send failed:", err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err);
       }
@@ -162,10 +151,7 @@ export async function POST(request: Request) {
       console.log("Skipping email. Missing SMTP configuration.");
     }
 
-
-
-
-    return NextResponse.json({ ...invite, id: invite.$id });
+    return NextResponse.json({ ...invite, id: invite.id });
   } catch (error: any) {
     console.error("Collaborator POST Error:", error instanceof Error ? { message: error.message, stack: error.stack } : error);
     return NextResponse.json(
@@ -190,100 +176,92 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { databases, users } = await createAdminClient();
+    const supabase = await createSupabaseServerClient();
 
-    /* Fetch collaborators */
-    const collabsRes = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-      [Query.equal("project_id", projectId)]
-    );
+    /* Fetch project to verify caller access and to get owner_id */
+    const { data: project, error: projectErr } = await supabase
+      .from("projects")
+      .select("owner_id, created_at")
+      .eq("id", projectId)
+      .single();
 
-    /* Check access and AUTO-SEED OWNER IF MISSING */
-    const existingAccess = collabsRes.documents.find((doc: any) => doc.user_id === user.$id);
+    if (projectErr || !project) {
+      console.error("Collaborators API - Project fetch failed:", {
+        error: projectErr,
+        data: project,
+        projectId,
+        userId: user.$id
+      });
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    /* Fetch collaborators from Supabase joined with profiles */
+    const { data: collabs, error: collabsErr } = await supabase
+      .from("project_collaborators")
+      .select(`
+        id,
+        user_id,
+        role,
+        created_at,
+        profiles (
+          id,
+          name,
+          email,
+          username,
+          avatar_url
+        )
+      `)
+      .eq("project_id", projectId);
+
+    if (collabsErr) {
+      throw collabsErr;
+    }
 
     let callerRole = "";
-
-    if (!existingAccess) {
-      // Check if the caller is the actual project creator
-      const project = await databases.getDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-        projectId
-      );
-
-      if (project.owner_id === user.$id) {
-        // Assume project creator → seed as owner
-        await databases.createDocument(
-          process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-          process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-          ID.unique(),
-          {
-            project_id: projectId,
-            user_id: user.$id,
-            role: "owner",
-          }
-        );
-        callerRole = "owner";
+    if (project.owner_id === user.$id) {
+      callerRole = "owner";
+    } else {
+      const callerCollab = (collabs || []).find((c: any) => c.user_id === user.$id);
+      if (callerCollab) {
+        callerRole = callerCollab.role === 'member' ? 'viewer' : callerCollab.role;
       } else {
         return NextResponse.json(
           { error: "Unauthorized access to project" },
           { status: 403 }
         );
       }
-    } else {
-      callerRole = existingAccess.role;
     }
 
-    const collaborators = await Promise.all(collabsRes.documents.map(async (doc) => {
-      let email = "User_" + doc.user_id.substring(0, 4);
-      let name = "Unknown User";
-      let username = "";
-      let avatarUrl = "";
-
-      try {
-        const targetUser = await users.get(doc.user_id);
-        email = targetUser.email;
-        name = targetUser.name || targetUser.email.split('@')[0];
-        username = targetUser.email.split('@')[0];
-        avatarUrl = targetUser.prefs?.avatar_url || "";
-      } catch (e) {
-        // Fallback for current user (might be faster)
-        if (doc.user_id === user.$id) {
-          email = user.email;
-          name = user.name || user.email.split('@')[0];
-          username = user.email.split('@')[0];
-          avatarUrl = user.prefs?.avatar_url || "";
-        }
-      }
-
+    // Map collaborators from Supabase schema
+    const collaborators = (collabs || []).map((collab: any) => {
+      const profile = collab.profiles || {};
       return {
-        id: doc.$id,
-        user_id: doc.user_id,
-        role: doc.role,
-        created_at: doc.$createdAt,
-        email,
-        name,
-        username,
-        avatar_url: avatarUrl
+        id: collab.id,
+        user_id: collab.user_id,
+        role: collab.role === 'member' ? 'viewer' : collab.role,
+        created_at: collab.created_at,
+        email: profile.email || "Unknown",
+        name: profile.name || "Unknown User",
+        username: profile.username || "",
+        avatar_url: profile.avatar_url || ""
       };
-    }));
+    });
 
     /* Fetch invites if admin/owner */
     let invites: any[] = [];
 
     if (callerRole === "owner" || callerRole === "admin") {
-      const invitesRes = await databases.listDocuments(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-        process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_INVITES_ID!,
-        [Query.equal("project_id", projectId)]
-      );
+      const { data: invitesRes } = await supabase
+        .from("project_invites")
+        .select("*")
+        .eq("project_id", projectId)
+        .eq("status", "pending");
 
-      invites = invitesRes.documents.map((doc) => ({
-        id: doc.$id,
+      invites = (invitesRes || []).map((doc) => ({
+        id: doc.id,
         email: doc.email,
         role: doc.role,
-        invited_at: doc.$createdAt,
+        invited_at: doc.invited_at,
       }));
     }
 
@@ -309,7 +287,6 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { databases } = await createAdminClient();
     const { projectId, collaboratorId, newRole } = await request.json();
 
     if (!projectId || !collaboratorId || !newRole) {
@@ -326,25 +303,36 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Verify caller is owner or admin
-    const allAccess = await databases.listDocuments(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-      [
-        Query.equal("project_id", projectId),
-      ]
-    );
+    const supabase = await createSupabaseServerClient();
 
-    const callerDoc = allAccess.documents.find((doc: any) => doc.user_id === user.$id);
+    // Verify project exists and fetch owner
+    const { data: project, error: projectErr } = await supabase
+      .from("projects")
+      .select("owner_id")
+      .eq("id", projectId)
+      .single();
 
-    if (!callerDoc) {
-      return NextResponse.json(
-        { error: "Unauthorized access to project" },
-        { status: 403 }
-      );
+    if (projectErr || !project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const callerRole = callerDoc.role;
+    // Verify caller is owner or admin in Supabase
+    let callerRole = "";
+    if (project.owner_id === user.$id) {
+      callerRole = "owner";
+    } else {
+      const { data: collab } = await supabase
+        .from("project_collaborators")
+        .select("role")
+        .eq("project_id", projectId)
+        .eq("user_id", user.$id)
+        .maybeSingle();
+
+      if (collab) {
+        callerRole = collab.role === 'member' ? 'viewer' : collab.role;
+      }
+    }
+
     if (callerRole !== "owner" && callerRole !== "admin") {
       return NextResponse.json(
         { error: "Insufficient permissions to modify roles" },
@@ -352,17 +340,29 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Update the collaborator document
-    const updatedCollaborator = await databases.updateDocument(
-      process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-      process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-      collaboratorId,
-      {
-        role: newRole,
-      }
-    );
+    // Map role: 'viewer' -> 'member' for Supabase
+    const dbRole = newRole === 'viewer' ? 'member' : newRole;
 
-    return NextResponse.json({ success: true, collaborator: updatedCollaborator });
+    // Update the collaborator role in Supabase
+    const { data: updatedCollab, error: updateErr } = await supabase
+      .from("project_collaborators")
+      .update({ role: dbRole })
+      .eq("id", collaboratorId)
+      .select()
+      .single();
+
+    if (updateErr) {
+      throw updateErr;
+    }
+
+    return NextResponse.json({
+      success: true,
+      collaborator: {
+        ...updatedCollab,
+        id: updatedCollab.id,
+        role: updatedCollab.role === 'member' ? 'viewer' : updatedCollab.role
+      }
+    });
   } catch (error: any) {
     console.error("Collaborator PATCH Error:", error?.message || error);
     return NextResponse.json(

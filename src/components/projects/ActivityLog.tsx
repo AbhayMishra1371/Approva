@@ -13,7 +13,7 @@ import {
     FolderOpen,
     IdCard
 } from "lucide-react";
-import { createBrowserClient } from "@/lib/appwrite/client";
+import { getJwt } from "@/lib/auth/auth";
 
 interface ActivityLogProps {
     projectId?: string;
@@ -46,8 +46,7 @@ export function ActivityLog({ projectId, assetId }: ActivityLogProps) {
             setIsLoading(true);
             setError(null);
             try {
-                const { account } = createBrowserClient();
-                const { jwt } = await account.createJWT();
+                const jwt = await getJwt();
 
                 // If no projectId, we fetch from the global activity API
                 const url = projectId

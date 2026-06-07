@@ -1,5 +1,6 @@
 import { AssetRepository } from "./asset.repository";
 import { AssetData, UserContext } from "./asset.types";
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 export class AssetService {
     private repository: AssetRepository;
@@ -9,13 +10,18 @@ export class AssetService {
     }
 
     async getAllAssetsForUser(user: UserContext) {
-        // 1. Fetch owned projects
+        // 1. Fetch owned projects from Supabase
         let ownedProjects: any[] = [];
+        const supabase = await createSupabaseServerClient();
         try {
-            const docs = await this.repository.getOwnedProjects(user.$id);
-            ownedProjects = docs
-                .filter((doc: any) => doc.owner_id === user.$id)
-                .map((doc: any) => ({ ...doc, id: doc.$id }));
+            const { data: ownedProjectsRes, error: ownedErr } = await supabase
+                .from("projects")
+                .select("*")
+                .eq("owner_id", user.$id);
+
+            if (ownedErr) throw ownedErr;
+
+            ownedProjects = (ownedProjectsRes || []).map((doc: any) => ({ ...doc, id: doc.id, $id: doc.id }));
         } catch (e) {
             console.warn("Could not query owned projects:", e);
         }
@@ -26,7 +32,7 @@ export class AssetService {
         let collabProjectIds: string[] = [];
         try {
             const collabs = await this.repository.getCollaboratorProjects(user.$id);
-            
+
             const filteredCollabs = collabs.filter((doc: any) => doc.user_id === user.$id);
             if (filteredCollabs.length !== collabs.length) {
                 console.warn(`[SECURITY ALERT] Assets API: Collaborator query returned ${collabs.length} docs, but only ${filteredCollabs.length} matched user_id ${user.$id}.`);
@@ -52,14 +58,20 @@ export class AssetService {
             projectNamesMap[proj.id] = proj.name;
         }
 
-        // Fetch names for collab projects not owned
+        // Fetch names for collab projects not owned from Supabase
         const remainingIds = collabProjectIds.filter(id => !ownedIds.has(id));
         if (remainingIds.length > 0) {
-            const projectPromises = remainingIds.map(id => this.repository.getProjectById(id));
-            const results = await Promise.all(projectPromises);
-            results.filter(doc => doc !== null).forEach((doc: any) => {
-                projectNamesMap[doc.$id] = doc.name;
-            });
+            try {
+                const { data: collabProjRes } = await supabase
+                    .from("projects")
+                    .select("id, name")
+                    .in("id", remainingIds);
+                (collabProjRes || []).forEach((doc: any) => {
+                    projectNamesMap[doc.id] = doc.name;
+                });
+            } catch (e) {
+                console.warn("Error fetching collab projects names from Supabase:", e);
+            }
         }
 
         // 4. Fetch assets for all these projects
@@ -132,13 +144,11 @@ export class AssetService {
 
     private async generateThumbnail(filePath: string, fileType: string): Promise<string> {
         if (fileType.startsWith('image/')) {
-            const endpoint = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT;
-            const bucketId = process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID;
-            const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT;
-            if (endpoint && bucketId && projectId) {
-                return `${endpoint}/storage/buckets/${bucketId}/files/${filePath}/preview?project=${projectId}&width=400&height=400`;
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+            if (supabaseUrl) {
+                return `${supabaseUrl}/storage/v1/object/public/assets/${filePath}`;
             }
         }
-        return ""; 
+        return "";
     }
 }

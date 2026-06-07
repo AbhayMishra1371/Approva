@@ -11,7 +11,7 @@ import {
     FolderGit2,
     Loader2
 } from "lucide-react";
-import { createBrowserClient } from "@/lib/appwrite/client";
+import { getJwt } from "@/lib/auth/auth";
 
 interface Asset {
     id: string;
@@ -36,8 +36,7 @@ export default function AssetsPage() {
 
     const fetchAssets = async () => {
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
             const res = await fetch("/api/assets", {
                 headers: { "Authorization": `Bearer ${jwt}` }
             });

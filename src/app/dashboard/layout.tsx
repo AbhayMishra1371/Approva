@@ -103,10 +103,10 @@ export default function DashboardLayout({
         router.push("/");
     };
 
-    const userName = user?.name || user?.email?.split("@")[0] || "User";
+    const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
     const userInitial = userName.charAt(0).toUpperCase();
-    const userRole = user?.prefs?.role || "Member";
-    const userAvatar = user?.prefs?.avatar_url || user?.prefs?.picture;
+    const userRole = user?.user_metadata?.prefs?.role || "Member";
+    const userAvatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || user?.user_metadata?.prefs?.avatar_url || user?.user_metadata?.prefs?.picture;
 
     return (
         <div className="flex h-screen w-full bg-[#0b0c10] text-slate-200 font-sans overflow-hidden">

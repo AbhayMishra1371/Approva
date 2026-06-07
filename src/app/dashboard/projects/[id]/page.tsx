@@ -23,6 +23,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AssetUpload } from "@/components/projects/AssetUpload";
 import { createBrowserClient } from "@/lib/appwrite/client";
 import { Query, Permission, Role, ID } from "appwrite";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { ActivityLog } from "@/components/projects/ActivityLog";
 import { toast } from "sonner";
 import { getJwt } from "@/lib/auth/auth";
@@ -97,18 +98,19 @@ export default function ProjectDetailPage() {
     const fetchAssets = async () => {
         setIsLoadingAssets(true);
         try {
-            const { databases } = createBrowserClient();
-            const assetsResponse = await databases.listDocuments(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-                [
-                    Query.equal("project_id", id),
-                    Query.equal("is_latest", true),
-                    Query.orderDesc("$createdAt")
-                ]
-            );
-            const data = assetsResponse.documents.map((doc: any) => ({ ...doc, id: doc.$id }));
-            setAssets(data);
+            const supabase = createSupabaseClient();
+            const { data: assetsData, error } = await supabase
+                .from("assets")
+                .select("*")
+                .eq("project_id", id)
+                .eq("is_latest", true)
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+            setAssets((assetsData || []).map((doc: any) => ({
+                ...doc,
+                size: doc.file_size
+            })));
         } catch (error) {
             console.error("Error fetching assets", error);
         } finally {
@@ -140,8 +142,7 @@ export default function ProjectDetailPage() {
 
     const handleDeleteProject = async (projectId: string) => {
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
 
             const res = await fetch(`/api/projects/${projectId}`, {
                 method: "DELETE",
@@ -165,27 +166,29 @@ export default function ProjectDetailPage() {
 
     const handleDeleteAsset = async (assetId: string) => {
         try {
-            const { databases, storage } = createBrowserClient();
-            const assetObj = await databases.getDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-                assetId
-            );
+            const supabase = createSupabaseClient();
+            const { data: assetObj, error: fetchErr } = await supabase
+                .from("assets")
+                .select("file_path")
+                .eq("id", assetId)
+                .single();
 
-            if (assetObj.file_path) {
+            if (fetchErr) throw fetchErr;
+
+            if (assetObj?.file_path) {
                 try {
-                    await storage.deleteFile(
-                        process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
-                        assetObj.file_path
-                    );
+                    await supabase.storage
+                        .from("assets")
+                        .remove([assetObj.file_path]);
                 } catch (err) { }
             }
 
-            await databases.deleteDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-                assetId
-            );
+            const { error: deleteErr } = await supabase
+                .from("assets")
+                .delete()
+                .eq("id", assetId);
+
+            if (deleteErr) throw deleteErr;
 
             fetchAssets();
             toast.success("Asset deleted successfully");
@@ -200,8 +203,7 @@ export default function ProjectDetailPage() {
         if (!inviteEmail) return;
         setIsInviting(true);
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
             const res = await fetch("/api/projects/collaborators", {
                 method: "POST",
                 headers: {
@@ -224,27 +226,21 @@ export default function ProjectDetailPage() {
 
                 // Create Activity Log
                 try {
-                    const { databases, account } = createBrowserClient();
-                    const user = await account.get();
-                    await databases.createDocument(
-                        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                        process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
-                        ID.unique(),
-                        {
-                            project_id: id,
-                            user_id: user.$id,
-                            user_email: user.email,
-                            action: "invited_user",
-                            entity_type: "invite",
-                            entity_id: id, // Linking to project as invite doesn't have a specific ID here
-                            metadata: JSON.stringify({ invited_email: invitedEmail })
-                        },
-                        [
-                            Permission.read(Role.users()),
-                            Permission.update(Role.user(user.$id)),
-                            Permission.delete(Role.user(user.$id))
-                        ]
-                    );
+                    const supabase = createSupabaseClient();
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                        await supabase
+                            .from("activity_logs")
+                            .insert({
+                                project_id: id,
+                                user_id: user.id,
+                                user_email: user.email || "",
+                                action: "invited_user",
+                                entity_type: "invite",
+                                entity_id: id,
+                                metadata: JSON.stringify({ invited_email: invitedEmail })
+                            });
+                    }
                 } catch (logError) {
                     console.error("Failed to log invite activity:", logError);
                 }

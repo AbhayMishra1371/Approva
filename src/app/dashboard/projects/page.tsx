@@ -15,7 +15,8 @@ import {
     X,
     Loader2
 } from "lucide-react";
-import { createBrowserClient } from "@/lib/appwrite/client";
+import { getJwt } from "@/lib/auth/auth";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { Query, ID, Permission, Role } from "appwrite";
 import { toast } from "sonner";
 import {
@@ -43,8 +44,7 @@ export default function ProjectsPage() {
 
     const fetchProjects = async () => {
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
             const res = await fetch("/api/projects", {
                 headers: { "Authorization": `Bearer ${jwt}` }
             });
@@ -53,7 +53,8 @@ export default function ProjectsPage() {
                 const data = await res.json();
                 setProjects(data.projects);
             } else {
-                console.error("Failed to fetch projects");
+                const errText = await res.text();
+                console.error("Failed to fetch projects. Status:", res.status, "Response:", errText);
             }
         } catch (err) {
             console.error("Error fetching projects:", err instanceof Error ? err.message : err);
@@ -64,8 +65,7 @@ export default function ProjectsPage() {
 
     const handleDeleteProject = async (projectId: string) => {
         try {
-            const { account } = createBrowserClient();
-            const { jwt } = await account.createJWT();
+            const jwt = await getJwt();
 
             const res = await fetch(`/api/projects/${projectId}`, {
                 method: "DELETE",
@@ -268,65 +268,29 @@ function CreateProjectModal({
         };
 
         try {
-            const { account, databases } = createBrowserClient();
-            const user = await account.get();
+            const jwt = await getJwt();
 
-            const project = await databases.createDocument(
-                process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!,
-                ID.unique(),
-                {
-                    name: data.name,
-                    client_name: data.clientName,
-                    deadline: data.deadline,
-                    status: data.status || "Active",
-                    owner_id: user.$id,
-                }
-            );
+            const res = await fetch("/api/projects", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${jwt}`
+                },
+                body: JSON.stringify(data)
+            });
 
-            try {
-                await databases.createDocument(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-                    ID.unique(),
-                    {
-                        project_id: project.$id,
-                        user_id: user.$id,
-                        role: "owner"
-                    }
-                );
-            } catch (collabError) {
-                console.error("Failed to insert owner as collaborator (check permissions):", collabError);
+            if (res.ok) {
+                const newProject = await res.json();
+                onSuccess(newProject);
+                toast.success("Project created successfully!");
+            } else {
+                const errText = await res.text();
+                console.error("Failed to create project. Status:", res.status, "Response:", errText);
+                toast.error(`Failed to create project: ${errText}`);
             }
-
-            // 4. Create Activity Log
-            try {
-                await databases.createDocument(
-                    process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-                    process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ACTIVITY_LOG_ID || "activity_logs",
-                    ID.unique(),
-                    {
-                        project_id: project.$id,
-                        user_id: user.$id,
-                        user_email: user.email,
-                        action: "created_project",
-                        entity_type: "project",
-                        entity_id: project.$id,
-                        metadata: JSON.stringify({ project_name: data.name })
-                    },
-                    [
-                        Permission.read(Role.users()),
-                        Permission.update(Role.user(user.$id)),
-                        Permission.delete(Role.user(user.$id))
-                    ]
-                );
-            } catch (logError) {
-                console.error("Failed to log project creation activity:", logError);
-            }
-
-            onSuccess({ ...project, id: project.$id } as any);
         } catch (err) {
             console.error("Error creating project:", err instanceof Error ? err.message : err);
+            toast.error("An error occurred while creating the project.");
         } finally {
             setIsSubmitting(false);
         }

@@ -1,101 +1,157 @@
 import { Query, ID } from "node-appwrite";
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 export class AssetRepository {
     private databases: any;
     private databaseId: string;
     private collectionAssetsId: string;
-    private collectionProjectsId: string;
-    private collectionCollaboratorsId: string;
-    private collectionGeneralCommentsId: string;
 
     constructor(databases: any) {
         this.databases = databases;
         this.databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!;
         this.collectionAssetsId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!;
-        this.collectionProjectsId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_PROJECTS_ID!;
-        this.collectionCollaboratorsId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!;
-        this.collectionGeneralCommentsId = process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_GENERAL_COMMENTS_ID || 'general_comments';
     }
 
-    async getOwnedProjects(userId: string) {
-        const res = await this.databases.listDocuments(this.databaseId, this.collectionProjectsId, [
-            Query.equal("owner_id", userId)
-        ]);
-        return res.documents;
-    }
 
     async getCollaboratorProjects(userId: string) {
-        try {
-            const res = await this.databases.listDocuments(this.databaseId, this.collectionCollaboratorsId, [
-                Query.equal("user_id", userId)
-            ]);
-            return res.documents;
-        } catch (err) {
-            // Fallback
-            const allCollabs = await this.databases.listDocuments(this.databaseId, this.collectionCollaboratorsId, [
-                Query.limit(5000)
-            ]);
-            return allCollabs.documents.filter((doc: any) => doc.user_id === userId);
+        const supabase = await createSupabaseServerClient();
+        const { data, error } = await supabase
+            .from("project_collaborators")
+            .select("project_id")
+            .eq("user_id", userId);
+
+        if (error) {
+            console.error("Error fetching collaborator projects from Supabase:", error);
+            return [];
         }
+
+        return (data || []).map((doc: any) => ({
+            project_id: doc.project_id,
+            user_id: userId
+        }));
     }
 
-    async getProjectById(projectId: string) {
-        return this.databases.getDocument(this.databaseId, this.collectionProjectsId, projectId).catch(() => null);
-    }
 
-    async getAssetsByProjectIds(projectIds: string[], chunkSize = 50) {
-        let allAssets: any[] = [];
-        for (let i = 0; i < projectIds.length; i += chunkSize) {
-            const chunk = projectIds.slice(i, i + chunkSize);
-            const res = await this.databases.listDocuments(this.databaseId, this.collectionAssetsId, [
-                Query.equal("project_id", chunk),
-                Query.orderDesc("$createdAt"),
-                Query.limit(100)
-            ]);
-            allAssets.push(...res.documents);
+    async getAssetsByProjectIds(projectIds: string[]) {
+        const supabase = await createSupabaseServerClient();
+        const { data, error } = await supabase
+            .from("assets")
+            .select("*")
+            .in("project_id", projectIds)
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            console.error("Error fetching assets by project IDs:", error);
+            return [];
         }
-        return allAssets;
+
+        return (data || []).map((doc: any) => ({
+            ...doc,
+            size: doc.file_size,
+            $id: doc.id,
+            $createdAt: doc.created_at,
+            $updatedAt: doc.updated_at
+        }));
     }
 
     async getLatestAssetByName(projectId: string, fileName: string) {
-        const res = await this.databases.listDocuments(this.databaseId, this.collectionAssetsId, [
-            Query.equal("project_id", projectId),
-            Query.equal("file_name", fileName),
-            Query.orderDesc("$createdAt"),
-            Query.limit(1)
-        ]);
-        return res.total > 0 ? res.documents[0] : null;
+        const supabase = await createSupabaseServerClient();
+        const { data, error } = await supabase
+            .from("assets")
+            .select("*")
+            .eq("project_id", projectId)
+            .eq("file_name", fileName)
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+        if (error) {
+            console.error("Error fetching latest asset by name:", error);
+            return null;
+        }
+
+        if (!data || data.length === 0) return null;
+        const doc = data[0];
+        return {
+            ...doc,
+            size: doc.file_size,
+            $id: doc.id,
+            $createdAt: doc.created_at,
+            $updatedAt: doc.updated_at
+        };
     }
 
     async createAsset(data: any) {
-        return this.databases.createDocument(
-            this.databaseId,
-            this.collectionAssetsId,
-            ID.unique(),
-            data
-        );
+        const supabase = await createSupabaseServerClient();
+        const { data: newDoc, error } = await supabase
+            .from("assets")
+            .insert({
+                project_id: data.project_id,
+                file_name: data.file_name,
+                file_path: data.file_path,
+                file_type: data.file_type,
+                file_size: data.size,
+                url: data.url,
+                version: data.version,
+                status: data.status || 'Pending',
+                asset_group_id: data.asset_group_id,
+                is_latest: data.is_latest !== undefined ? data.is_latest : true
+            })
+            .select()
+            .single();
+
+        if (error) {
+            throw error;
+        }
+
+        return {
+            ...newDoc,
+            size: newDoc.file_size,
+            $id: newDoc.id,
+            $createdAt: newDoc.created_at,
+            $updatedAt: newDoc.updated_at
+        };
     }
 
     async updateAssetStatus(assetId: string, status: string) {
-        return this.databases.updateDocument(
-            this.databaseId,
-            this.collectionAssetsId,
-            assetId,
-            { status: status }
-        );
+        const supabase = await createSupabaseServerClient();
+        const { data: updatedDoc, error } = await supabase
+            .from("assets")
+            .update({ status: status })
+            .eq("id", assetId)
+            .select()
+            .single();
+
+        if (error) {
+            throw error;
+        }
+
+        return {
+            ...updatedDoc,
+            size: updatedDoc.file_size,
+            $id: updatedDoc.id,
+            $createdAt: updatedDoc.created_at,
+            $updatedAt: updatedDoc.updated_at
+        };
     }
 
     async createGeneralComment(assetId: string, userId: string, userEmail: string, text: string) {
-        return this.databases.createDocument(
-            this.databaseId,
-            this.collectionGeneralCommentsId,
-            ID.unique(),
-            {
+        const supabase = await createSupabaseServerClient();
+        const { data, error } = await supabase
+            .from("general_comments")
+            .insert({
                 asset_id: assetId,
                 user_id: userId,
                 user_email: userEmail,
-                text: text
-            }
-        );
+                text: text,
+                mentions: []
+            })
+            .select()
+            .single();
+
+        if (error) {
+            throw error;
+        }
+
+        return data;
     }
 }

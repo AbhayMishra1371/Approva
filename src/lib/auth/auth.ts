@@ -1,11 +1,22 @@
-import { createBrowserClient } from "@/lib/appwrite/client";
-import { ID } from "appwrite";
+import { createClient } from "@/lib/supabase/client";
+import { createUserProfile } from "@/lib/supabase/profile";
 
 export const signUp = async (email: string, password: string, name: string) => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        const user = await account.create(ID.unique(), email, password, name);
-        return { user, error: null };
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: name,
+                }
+            }
+        });
+        if (data?.user) {
+            await createUserProfile();
+        }
+        return { user: data.user, error };
     } catch (error: any) {
         console.error("SignUp Error:", error?.message || error);
         return { user: null, error };
@@ -13,11 +24,16 @@ export const signUp = async (email: string, password: string, name: string) => {
 };
 
 export const login = async (email: string, password: string) => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        const session = await account.createEmailPasswordSession(email, password);
-        const user = await account.get();
-        return { user, session, error: null };
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+        if (data?.user) {
+            await createUserProfile();
+        }
+        return { user: data.user, session: data.session, error };
     } catch (error: any) {
         console.error("Login Error:", error?.message || error);
         return { user: null, session: null, error };
@@ -25,37 +41,64 @@ export const login = async (email: string, password: string) => {
 };
 
 export const getUser = async () => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        const user = await account.get();
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) {
+            if (error.message.includes("Refresh Token Not Found") || error.message.includes("refresh token") || error.message.includes("session missing")) {
+                await supabase.auth.signOut().catch(() => {});
+            } else {
+                console.error("GetUser API Error:", error.message);
+            }
+            return null;
+        }
         return user;
     } catch (error: any) {
-        if (error?.code !== 401 && !error?.message?.includes('missing scopes')) {
-            console.error("GetUser Error:", error?.message || error);
+        if (error?.name === "AuthApiError" && error?.message?.includes("Refresh Token Not Found")) {
+            await supabase.auth.signOut().catch(() => {});
+            return null;
         }
+        console.error("GetUser Error:", error?.message || error);
         return null;
     }
 };
 
 export const getJwt = async () => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        const user = await account.get().catch(() => null);
-        if (!user) return null;
-
-        const jwt = await account.createJWT();
-        return jwt.jwt;
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+            if (error.message.includes("Refresh Token Not Found") || error.message.includes("refresh token") || error.message.includes("session missing")) {
+                await supabase.auth.signOut().catch(() => {});
+            } else {
+                console.error("GetJWT API Error:", error.message);
+            }
+            return null;
+        }
+        return session?.access_token || null;
     } catch (error: any) {
+        if (error?.name === "AuthApiError" && error?.message?.includes("Refresh Token Not Found")) {
+            await supabase.auth.signOut().catch(() => {});
+            return null;
+        }
         console.error("GetJWT Error:", error?.message || error);
         return null;
     }
 };
 
 export const updateName = async (name: string) => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        await account.updateName(name);
-        return { success: true, error: null };
+        const { error } = await supabase.auth.updateUser({
+            data: { full_name: name }
+        });
+        if (!error) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                await supabase.from("profiles").update({ name }).eq("id", user.id);
+            }
+        }
+        return { success: !error, error };
     } catch (error: any) {
         console.error("UpdateName Error:", error?.message || error);
         return { success: false, error };
@@ -63,11 +106,15 @@ export const updateName = async (name: string) => {
 };
 
 export const updatePrefs = async (prefs: any) => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        const user = await account.get();
-        await account.updatePrefs({ ...user.prefs, ...prefs });
-        return { success: true, error: null };
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) return { success: false, error: authError || new Error("Not logged in") };
+        
+        const { error } = await supabase.auth.updateUser({
+            data: { prefs: { ...(user.user_metadata?.prefs || {}), ...prefs } }
+        });
+        return { success: !error, error };
     } catch (error: any) {
         console.error("UpdatePrefs Error:", error?.message || error);
         return { success: false, error };
@@ -75,13 +122,38 @@ export const updatePrefs = async (prefs: any) => {
 };
 
 export const logout = async () => {
-    const { account } = createBrowserClient();
+    const supabase = createClient();
     try {
-        await account.deleteSession("current");
+        await supabase.auth.signOut();
     } catch (error: any) {
-        // Ignore errors related to missing session/scopes (already logged out)
-        if (error?.code !== 401 && !error?.message?.includes('missing scopes')) {
-            console.error("Logout Error:", error?.message || error);
+        console.error("Logout Error:", error?.message || error);
+    }
+};
+
+export const getUserAvatar = async () => {
+    try {
+        const supabase = createClient();
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error || !user) {
+            return null;
         }
+
+        // Check if user logged in via Google
+        const googleIdentity = user.identities?.find((identity) => identity.provider === "google");
+        
+        if (googleIdentity && user.user_metadata?.picture) {
+            // Return Google avatar URL from metadata
+            return user.user_metadata.picture;
+        }
+
+        // Generate avatar from user's initial letter
+        const userName = user.user_metadata?.full_name || user.email || "User";
+        const initialLetter = userName.charAt(0).toUpperCase();
+        
+        return initialLetter;
+    } catch (error: any) {
+        console.error("GetUserAvatar Error:", error?.message || error);
+        return null;
     }
 };

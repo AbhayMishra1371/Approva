@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getLoggedInUser } from "@/lib/appwrite/server";
-import { ID, Query } from "node-appwrite";
+import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+
 import { AssetController } from "@/modules/assets/asset.controller";
 import { AssetValidation } from "@/modules/assets/asset.validation";
 
@@ -14,38 +14,52 @@ export async function GET(
         const resolvedParams = await params;
         const projectId = resolvedParams.id;
 
-        const { user, databases } = await getLoggedInUser();
+        const { user } = await getLoggedInUser();
 
-        if (!user || !databases) {
+        if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Verify user has access to this project
-        const collabs = await databases.listDocuments(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-            [
-                Query.equal("project_id", projectId),
-                Query.equal("user_id", user.$id),
-                Query.limit(1)
-            ]
-        );
+        // Verify user has access to this project in Supabase
+        const supabase = await createSupabaseServerClient();
+        const { data: project, error: projErr } = await supabase
+            .from("projects")
+            .select("owner_id")
+            .eq("id", projectId)
+            .single();
 
-        if (collabs.total === 0) {
-            return NextResponse.json({ error: "Unauthorized access to this project" }, { status: 403 });
+        if (projErr || !project) {
+            return NextResponse.json({ error: "Project not found" }, { status: 404 });
         }
 
-        const assetsResponse = await databases.listDocuments(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-            [
-                Query.equal("project_id", projectId),
-                Query.orderDesc("$createdAt")
-            ]
-        );
+        let hasAccess = project.owner_id === user.$id;
+
+        if (!hasAccess) {
+            const { data: collab } = await supabase
+                .from("project_collaborators")
+                .select("id")
+                .eq("project_id", projectId)
+                .eq("user_id", user.$id)
+                .maybeSingle();
+
+            if (collab) {
+                hasAccess = true;
+            }
+        }
+
+        if (!hasAccess) {
+            return NextResponse.json({ error: "Unauthorized access to this project" }, { status: 403 });
+        }
+        const { data: assetsData, error: assetsErr } = await supabase
+            .from("assets")
+            .select("*")
+            .eq("project_id", projectId)
+            .order("created_at", { ascending: false });
+
+        if (assetsErr) throw assetsErr;
 
         // Map Appwrite documents to replace $id with id for frontend
-        const assets = assetsResponse.documents.map((doc: any) => ({ ...doc, id: doc.$id }));
+        const assets = (assetsData || []).map((doc: any) => ({ ...doc, id: doc.id, size: doc.file_size }));
 
         return NextResponse.json(assets);
     } catch (error: any) {
@@ -63,32 +77,46 @@ export async function POST(
         const resolvedParams = await params;
         const projectId = resolvedParams.id;
 
-        const { user, databases } = await getLoggedInUser();
+        const { user } = await getLoggedInUser();
 
-        if (!user || !databases) {
+        if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        // Verify user has access to this project (owner, admin, or reviewer)
-        const collabs = await databases.listDocuments(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-            [
-                Query.equal("project_id", projectId),
-                Query.equal("user_id", user.$id),
-                Query.limit(1)
-            ]
-        );
+        // Verify user has access to this project and their role in Supabase
+        const supabase = await createSupabaseServerClient();
+        const { data: project, error: projErr } = await supabase
+            .from("projects")
+            .select("owner_id")
+            .eq("id", projectId)
+            .single();
 
-        if (collabs.total === 0) {
-            console.error("Authorization error: User is not a collaborator");
+        if (projErr || !project) {
+            return NextResponse.json({ error: "Project not found" }, { status: 404 });
+        }
+
+        let role = "";
+        if (project.owner_id === user.$id) {
+            role = "owner";
+        } else {
+            const { data: collab } = await supabase
+                .from("project_collaborators")
+                .select("role")
+                .eq("project_id", projectId)
+                .eq("user_id", user.$id)
+                .maybeSingle();
+
+            if (collab) {
+                role = collab.role === 'member' ? 'viewer' : collab.role;
+            }
+        }
+
+        if (!role) {
             return NextResponse.json({ error: "Unauthorized access to this project" }, { status: 403 });
         }
 
-        const colData = collabs.documents[0];
-
         // Only viewers are blocked from uploading
-        if (colData.role === 'viewer') {
+        if (role === 'viewer') {
             return NextResponse.json({ error: "Insufficient permissions to upload assets" }, { status: 403 });
         }
 
@@ -101,7 +129,7 @@ export async function POST(
 
         // Pass the request data to the new service
         // The service will handle versioning and thumbnail generation
-        const assetController = new AssetController(databases);
+        const assetController = new AssetController(null);
         const asset = await assetController.createAsset(user, projectId, json);
 
         return NextResponse.json(asset);
@@ -119,9 +147,9 @@ export async function DELETE(
         const resolvedParams = await params;
         const projectId = resolvedParams.id;
 
-        const { user, databases, storage } = await getLoggedInUser();
+        const { user } = await getLoggedInUser();
 
-        if (!user || !databases || !storage) {
+        if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -132,52 +160,66 @@ export async function DELETE(
             return NextResponse.json({ error: "Asset ID is required" }, { status: 400 });
         }
 
-        // Verify user has 'owner' or 'admin' role
-        const collabs = await databases.listDocuments(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_COLLABORATORS_ID!,
-            [
-                Query.equal("project_id", projectId),
-                Query.equal("user_id", user.$id),
-                Query.limit(1)
-            ]
-        );
+        // Verify user has 'owner' or 'admin' role in Supabase
+        const supabase = await createSupabaseServerClient();
+        const { data: project, error: projErr } = await supabase
+            .from("projects")
+            .select("owner_id")
+            .eq("id", projectId)
+            .single();
 
-        if (collabs.total === 0) {
-            return NextResponse.json({ error: "Unauthorized access" }, { status: 403 });
+        if (projErr || !project) {
+            return NextResponse.json({ error: "Project not found" }, { status: 404 });
         }
 
-        const colData = collabs.documents[0];
+        let role = "";
+        if (project.owner_id === user.$id) {
+            role = "owner";
+        } else {
+            const { data: collab } = await supabase
+                .from("project_collaborators")
+                .select("role")
+                .eq("project_id", projectId)
+                .eq("user_id", user.$id)
+                .maybeSingle();
 
-        if (colData.role !== 'owner' && colData.role !== 'admin') {
+            if (collab) {
+                role = collab.role === 'member' ? 'viewer' : collab.role;
+            }
+        }
+
+        if (role !== 'owner' && role !== 'admin') {
             return NextResponse.json({ error: "Insufficient permissions to delete this asset" }, { status: 403 });
         }
 
         // Get asset details to find file_path
-        const assetObj = await databases.getDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-            assetId
-        );
+        const { data: assetObj, error: fetchErr } = await supabase
+            .from("assets")
+            .select("file_path")
+            .eq("id", assetId)
+            .single();
 
-        // Delete from Appwrite Storage
-        if (assetObj.file_path) {
+        if (fetchErr) throw fetchErr;
+
+        // Delete from Supabase Storage
+        if (assetObj?.file_path) {
             try {
-                await storage.deleteFile(
-                    process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ASSETS_ID!,
-                    assetObj.file_path
-                );
+                const { error: storageErr } = await supabase.storage
+                    .from("assets")
+                    .remove([assetObj.file_path]);
+                if (storageErr) throw storageErr;
             } catch (storageError: any) {
                 console.error("Storage delete error:", storageError?.message || storageError);
             }
         }
 
-        // Delete from Appwrite Database
-        await databases.deleteDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID!,
-            process.env.NEXT_PUBLIC_APPWRITE_COLLECTION_ASSETS_ID!,
-            assetId
-        );
+        // Delete from Supabase Database
+        const { error: deleteErr } = await supabase
+            .from("assets")
+            .delete()
+            .eq("id", assetId);
+
+        if (deleteErr) throw deleteErr;
 
         return NextResponse.json({ success: true });
     } catch (error: any) {

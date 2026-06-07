@@ -1,7 +1,6 @@
 "use client";
 
-import { createBrowserClient } from "@/lib/appwrite/client";
-import { OAuthProvider } from "appwrite";
+import { createClient } from "@/lib/supabase/client";
 import { Chrome, ArrowLeft, Lock, Mail, Sparkles } from "lucide-react";
 
 import Image from "next/image";
@@ -24,8 +23,8 @@ function LoginForm() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const { account } = createBrowserClient();
-        const user = await account.get();
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           router.push("/dashboard");
         }
@@ -95,24 +94,24 @@ function LoginForm() {
 
     setIsLoading(provider);
     try {
-      const { account } = createBrowserClient();
-      const oauthProvider = provider === "google" ? OAuthProvider.Google : OAuthProvider.Github;
-
-      // Currently, Appwrite OAuth lacks a native 'state' param for passing arbitrary data like inviteId
-      // Store it in localStorage to retrieve it in standard DashboardLayout or a dedicated callback page
+      const supabase = createClient();
+      
       if (token) {
         localStorage.setItem("pendingInviteToken", token);
       }
 
       const successUrl = token
-        ? `${window.location.origin}/invitations/accept?token=${token}`
-        : `${window.location.origin}/dashboard`;
+        ? `/invitations/accept?token=${token}`
+        : `/dashboard`;
 
-      account.createOAuth2Session(
-        oauthProvider,
-        successUrl,
-        `${window.location.origin}/login`
-      );
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider === "google" ? "google" : "github",
+        options: {
+          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(successUrl)}`,
+        }
+      });
+      
+      if (error) throw error;
     } catch (error: any) {
       console.error("Login error:", error?.message || error);
       setIsLoading(null);
