@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "version:patch": "bash release.sh patch",
+    "version:minor": "bash release.sh minor",
+    "version:major": "bash release.sh major"
   },
   "dependencies": {
     "@react-email/components": "^1.0.8",
