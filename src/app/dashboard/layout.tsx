@@ -255,40 +255,44 @@ export default function DashboardLayout({
 
             {/* Main Content */}
             <main className="flex-1 flex flex-col w-full min-w-0 overflow-hidden">
-                {/* Desktop Top Header */}
-                <header className="hidden md:flex items-center justify-between px-8 py-4 border-b border-[#1f202b] bg-[#0b0c10]/50 backdrop-blur-md sticky top-0 z-40 shrink-0">
-                    <div className="flex items-center gap-4 flex-1">
-                        {/* Search bar or breadcrumbs could go here */}
-                        <div className="h-9 w-64 bg-[#12131a] border border-[#1f202b] rounded-xl flex items-center px-3 gap-2 text-slate-500 italic text-sm">
-                            <Activity className="w-4 h-4" />
-                            Search projects or assets...
+                {/* Desktop Top Header – hidden on asset detail pages */}
+                {!isAssetPage && (
+                    <header className="hidden md:flex items-center justify-between px-8 py-4 border-b border-[#1f202b] bg-[#0b0c10]/50 backdrop-blur-md sticky top-0 z-40 shrink-0">
+                        <div className="flex items-center gap-4 flex-1">
+                            {/* Search bar or breadcrumbs could go here */}
+                            <div className="h-9 w-64 bg-[#12131a] border border-[#1f202b] rounded-xl flex items-center px-3 gap-2 text-slate-500 italic text-sm">
+                                <Activity className="w-4 h-4" />
+                                Search projects or assets...
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4">
 
-                    </div>
-                </header>
-
-                {/* Mobile Header */}
-                <header className="md:hidden flex items-center justify-between p-4 border-b border-[#1f202b] bg-[#12131a] shrink-0">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-purple-600/10 flex items-center justify-center overflow-hidden">
-                            <img src="/approva-logo.svg" alt="Approva Logo" className="w-5 h-5 object-contain" />
                         </div>
-                        <h1 className="font-bold text-lg text-white leading-tight truncate max-w-[120px]">Hello {userName}</h1>
-                    </div>
-                    <div className="flex items-center gap-2">
+                    </header>
+                )}
 
-                        <button
-                            onClick={() => setIsMobileMenuOpen(true)}
-                            className="p-2 -mr-2 text-slate-400 hover:text-white"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                        </button>
-                    </div>
-                </header>
+                {/* Mobile Header – hidden on asset detail pages */}
+                {!isAssetPage && (
+                    <header className="md:hidden flex items-center justify-between p-4 border-b border-[#1f202b] bg-[#12131a] shrink-0">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-purple-600/10 flex items-center justify-center overflow-hidden">
+                                <img src="/approva-logo.svg" alt="Approva Logo" className="w-5 h-5 object-contain" />
+                            </div>
+                            <h1 className="font-bold text-lg text-white leading-tight truncate max-w-[120px]">Hello {userName}</h1>
+                        </div>
+                        <div className="flex items-center gap-2">
+
+                            <button
+                                onClick={() => setIsMobileMenuOpen(true)}
+                                className="p-2 -mr-2 text-slate-400 hover:text-white"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </header>
+                )}
 
                 <div className="flex-1 overflow-y-auto">
                     <div className="h-full px-4 py-4 md:px-8 md:py-6">{children}</div>

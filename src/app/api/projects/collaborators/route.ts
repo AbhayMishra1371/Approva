@@ -15,6 +15,10 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  tls: {
+    // Allow self-signed certificates in the chain (common behind proxies/VPNs)
+    rejectUnauthorized: false,
+  },
 });
 
 export const dynamic = "force-dynamic";
