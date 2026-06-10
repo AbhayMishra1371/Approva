@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+import { createNotification } from "@/lib/notifications";
 
 import nodemailer from "nodemailer";
 import { render } from "@react-email/render";
@@ -114,6 +115,39 @@ export async function POST(request: Request) {
 
     if (inviteErr || !invite) {
       return NextResponse.json({ error: "Failed to create invitation in Supabase" }, { status: 500 });
+    }
+
+    /* Send in-app notification to invitee (if they have an account) */
+    try {
+      const { data: inviteeProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (inviteeProfile) {
+        const senderProfile = await supabase
+          .from("profiles")
+          .select("name")
+          .eq("id", user.$id)
+          .maybeSingle();
+        const senderName = senderProfile?.data?.name || user.name || "Someone";
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const inviteLink = `${baseUrl}/invite?token=${inviteToken}`;
+
+        await createNotification({
+          user_id: inviteeProfile.id,
+          sender_id: user.$id,
+          project_id: projectId,
+          type: "project_invite",
+          title: "Project Invitation",
+          message: `${senderName} invited you to collaborate on ${project.name}`,
+          link: inviteLink,
+          metadata: { invite_id: invite.id, invite_token: inviteToken },
+        });
+      }
+    } catch (notifErr) {
+      console.error("Failed to create invite notification:", notifErr);
     }
 
     /* Send email via Nodemailer */

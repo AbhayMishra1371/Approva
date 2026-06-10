@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 import { AssetController } from "@/modules/assets/asset.controller";
+import { createNotification } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,52 @@ export async function POST(
         // 3. Update the Asset Document and optionally log it
         const assetController = new AssetController();
         const updatedAsset = await assetController.updateAssetStatus(user, projectId, assetId, status, comment);
+
+        // 4. Notify the asset uploader (if they are not the reviewer themselves)
+        try {
+          const { data: assetDoc } = await supabase
+            .from("assets")
+            .select("uploaded_by, file_name")
+            .eq("id", assetId)
+            .maybeSingle();
+
+          const uploaderId = assetDoc?.uploaded_by;
+          if (uploaderId && uploaderId !== user.$id) {
+            const typeMap: Record<string, "approval" | "rejection" | "changes_requested"> = {
+              approved: "approval",
+              rejected: "rejection",
+              changes_requested: "changes_requested",
+            };
+            const titleMap: Record<string, string> = {
+              approved: "Asset Approved ✅",
+              rejected: "Asset Rejected",
+              changes_requested: "Changes Requested",
+            };
+            const notifType = typeMap[status];
+            if (notifType) {
+              const { data: senderProfile } = await supabase
+                .from("profiles")
+                .select("name")
+                .eq("id", user.$id)
+                .maybeSingle();
+              const senderName = senderProfile?.name || user.name || "A reviewer";
+              const fileName = assetDoc?.file_name || "your asset";
+
+              await createNotification({
+                user_id: uploaderId,
+                sender_id: user.$id,
+                project_id: projectId,
+                type: notifType,
+                title: titleMap[status],
+                message: `${senderName} marked "${fileName}" as ${status.replace("_", " ")}`,
+                link: `/dashboard/projects/${projectId}/assets/${assetId}`,
+                metadata: { asset_id: assetId, status },
+              });
+            }
+          }
+        } catch (notifErr) {
+          console.error("Failed to create status notification:", notifErr);
+        }
 
         return NextResponse.json({ success: true, asset: { ...updatedAsset, id: updatedAsset.$id } });
 

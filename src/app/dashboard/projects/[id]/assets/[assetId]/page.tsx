@@ -556,7 +556,31 @@ export default function AssetDetailPage() {
                 profiles: doc.profiles
             } as any]);
 
-
+            // Fire mention notifications (fire-and-forget)
+            if (generalMentionedUserIds.length > 0) {
+                const senderName = currentUserProfile?.name || userEmail || "Someone";
+                generalMentionedUserIds.forEach(async (mentionedUserId) => {
+                    if (mentionedUserId === currentUserId) return; // Don't notify yourself
+                    try {
+                        await fetch("/api/notifications", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                user_id: mentionedUserId,
+                                sender_id: currentUserId,
+                                project_id: projectId,
+                                type: "mention",
+                                title: "You were mentioned",
+                                message: `${senderName} mentioned you in ${asset?.file_name || "a comment"}`,
+                                link: `/dashboard/projects/${projectId}/assets/${assetId}`,
+                                metadata: { asset_id: assetId },
+                            }),
+                        });
+                    } catch (e) {
+                        console.warn("Mention notification failed:", e);
+                    }
+                });
+            }
 
             setNewGeneralComment("");
             setGeneralMentionedUserIds([]);
@@ -574,6 +598,7 @@ export default function AssetDetailPage() {
             setIsSubmittingGeneralComment(false);
         }
     };
+
 
     const handleGeneralInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const value = e.target.value;
