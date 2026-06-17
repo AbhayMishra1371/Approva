@@ -64,6 +64,68 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 -   `src/providers`: React context providers (e.g., Auth, Theme).
 -   `Schema`: Database schema definitions (SQL).
 
+## 🔄 Version Control & Release Management
+
+This project uses semantic versioning with automated CI/CD pipelines triggered by version tags.
+
+### Version Bumping
+
+We provide three methods to bump versions:
+
+#### Method 1: Using NPM Scripts (Recommended)
+```bash
+# For bug fixes (0.1.0 → 0.1.1)
+npm run version:patch
+
+# For new features (0.1.0 → 0.2.0)
+npm run version:minor
+
+# For breaking changes (0.1.0 → 1.0.0)
+npm run version:major
+```
+
+#### Method 2: Using the Release Script Directly
+```bash
+# Make the script executable (first time only)
+chmod +x release.sh
+
+# Run the script
+./release.sh patch   # or minor, or major
+```
+
+### Release Workflow
+
+1. **Bump Version**: Run one of the version commands above
+2. **Review Changes**: The script will stage `package.json` and `package-lock.json`
+3. **Complete Release**: Run the command output by the script:
+   ```bash
+   git commit -m "chore: bump version to v0.1.1" && \
+   git tag -a "v0.1.1" -m "Release version 0.1.1" && \
+   git push origin HEAD --tags
+   ```
+
+### Automated CI/CD Pipeline
+
+When you push a version tag (e.g., `v0.1.1`), the GitHub Actions workflow automatically:
+
+1. ✅ Checks out the repository
+2. ✅ Sets up Node.js 20
+3. ✅ Installs dependencies
+4. ✅ Runs linting checks
+5. ✅ Builds the Next.js application
+6. ✅ Builds a Docker image
+7. ✅ Pushes the image to Docker Hub as `approva:latest`
+
+**Important**: The CI/CD pipeline is **only triggered by version tags** (format: `v*.*.*`), not by regular commits to main.
+
+### Version Tag Format
+
+All version tags must follow semantic versioning with a `v` prefix:
+- `v0.1.0` - Initial release
+- `v0.1.1` - Patch release
+- `v0.2.0` - Minor release
+- `v1.0.0` - Major release
+
 ## 📄 License
 
 This project is private and proprietary.
