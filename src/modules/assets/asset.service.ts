@@ -1,6 +1,7 @@
 import { AssetRepository } from "./asset.repository";
 import { AssetData, UserContext } from "./asset.types";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+import { CommentRepository } from "../comments/comment.repository";
 
 export class AssetService {
     private repository: AssetRepository;
@@ -128,7 +129,8 @@ export class AssetService {
 
         if (comment) {
             try {
-                await this.repository.createGeneralComment(
+                const commentRepo = new CommentRepository();
+                await commentRepo.createGeneralComment(
                     assetId,
                     user.$id,
                     user.email || 'unknown',

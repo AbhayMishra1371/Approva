@@ -24,7 +24,7 @@ import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { AnnotationCanvas, Annotation } from "@/components/projects/AnnotationCanvas";
 
-import { CommentThread, Comment } from "@/components/projects/CommentThread";
+import { CommentThread, Comment } from "@/modules/comments/components/CommentThread";
 
 import {
     AlertDialog,
