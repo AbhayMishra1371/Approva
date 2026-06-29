@@ -16,11 +16,11 @@ export async function GET(request: Request) {
       if (user) {
         console.log("OAuth Callback - User:", user); // Quick debug as suggested
         const { error: upsertError } = await supabase.from("profiles").upsert({
-            id: user.id,
-            name: user.user_metadata?.full_name || user.email?.split("@")[0],
-            email: user.email,
-            username: user.email?.split("@")[0],
-            avatar_url: user.user_metadata?.avatar_url || ""
+          id: user.id,
+          name: user.user_metadata?.full_name || user.email?.split("@")[0],
+          email: user.email,
+          username: user.email?.split("@")[0],
+          avatar_url: user.user_metadata?.avatar_url || ""
         })
 
         if (upsertError) {
@@ -28,16 +28,15 @@ export async function GET(request: Request) {
         }
       }
 
-      const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
-      const isLocalEnv = process.env.NODE_ENV === 'development'
-      if (isLocalEnv) {
-        // we can be sure that there is no load balancer in between, so no need to watch for X-Forwarded-Host
-        return NextResponse.redirect(`${origin}${next}`)
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`)
-      } else {
-        return NextResponse.redirect(`${origin}${next}`)
+      const forwardedHost = request.headers.get("x-forwarded-host");
+      const forwardedProto = request.headers.get("x-forwarded-proto");
+
+      if (forwardedHost) {
+        const protocol = forwardedProto ?? "http";
+        return NextResponse.redirect(`${protocol}://${forwardedHost}${next}`);
       }
+
+      return NextResponse.redirect(`${origin}${next}`);
     }
   }
 
