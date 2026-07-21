@@ -14,7 +14,6 @@ export async function GET(request: Request) {
       // Create user profile
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        console.log("OAuth Callback - User:", user); // Quick debug as suggested
         const { error: upsertError } = await supabase.from("profiles").upsert({
           id: user.id,
           name: user.user_metadata?.full_name || user.email?.split("@")[0],

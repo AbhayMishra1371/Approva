@@ -2,12 +2,18 @@ import { AssetRepository } from "./asset.repository";
 import { AssetData, UserContext } from "./asset.types";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 import { CommentRepository } from "../comments/comment.repository";
+import { getOrSetCache, invalidateCache } from "@/lib/cache";
 
 export class AssetService {
     private repository: AssetRepository;
 
     constructor() {
         this.repository = new AssetRepository();
+    }
+
+    async getAssetsByProjectId(projectId: string) {
+        const cacheKey = `project:${projectId}:assets`;
+        return getOrSetCache(cacheKey, 600, () => this.repository.getAssetsByProjectId(projectId));
     }
 
     async getAllAssetsForUser(user: UserContext) {
@@ -120,6 +126,9 @@ export class AssetService {
             url: url || "",
         });
 
+        // Invalidate assets cache for this project after upload / new version
+        await invalidateCache(`project:${projectId}:assets`);
+
         // We can attach the generated thumbnail url dynamically if not storing it
         return { ...asset, id: asset.$id, thumbnail_url: thumbnailUrl };
     }
@@ -141,6 +150,9 @@ export class AssetService {
             }
         }
 
+        // Invalidate assets cache for this project after update / approve / reject
+        await invalidateCache(`project:${projectId}:assets`);
+
         return { ...updatedAsset, id: updatedAsset.$id };
     }
 
@@ -154,3 +166,4 @@ export class AssetService {
         return "";
     }
 }
+

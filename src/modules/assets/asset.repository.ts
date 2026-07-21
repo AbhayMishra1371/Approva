@@ -45,6 +45,29 @@ export class AssetRepository {
         }));
     }
 
+    async getAssetsByProjectId(projectId: string) {
+        const supabase = await createSupabaseServerClient();
+        const { data, error } = await supabase
+            .from("assets")
+            .select("*")
+            .eq("project_id", projectId)
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            console.error("Error fetching assets by project ID:", error);
+            return [];
+        }
+
+        return (data || []).map((doc: any) => ({
+            ...doc,
+            id: doc.id,
+            size: doc.file_size,
+            $id: doc.id,
+            $createdAt: doc.created_at,
+            $updatedAt: doc.updated_at
+        }));
+    }
+
     async getLatestAssetByName(projectId: string, fileName: string) {
         const supabase = await createSupabaseServerClient();
         const { data, error } = await supabase

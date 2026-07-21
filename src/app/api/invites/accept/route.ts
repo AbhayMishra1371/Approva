@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+import { invalidateCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,9 @@ export async function POST(request: Request) {
             .from("project_invites")
             .update({ status: "accepted" })
             .eq("id", inviteObj.id);
+
+        // Invalidate project collaborators cache
+        await invalidateCache(`project:${inviteObj.project_id}:collaborators`);
 
         return NextResponse.json({
             ...newCollab,

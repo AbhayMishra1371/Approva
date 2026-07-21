@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+import { invalidateCache } from "@/lib/cache";
 
 import { AssetController } from "@/modules/assets/asset.controller";
 import { AssetValidation } from "@/modules/assets/asset.validation";
@@ -50,16 +51,9 @@ export async function GET(
         if (!hasAccess) {
             return NextResponse.json({ error: "Unauthorized access to this project" }, { status: 403 });
         }
-        const { data: assetsData, error: assetsErr } = await supabase
-            .from("assets")
-            .select("*")
-            .eq("project_id", projectId)
-            .order("created_at", { ascending: false });
 
-        if (assetsErr) throw assetsErr;
-
-        // Map Appwrite documents to replace $id with id for frontend
-        const assets = (assetsData || []).map((doc: any) => ({ ...doc, id: doc.id, size: doc.file_size }));
+        const assetController = new AssetController();
+        const assets = await assetController.getAssetsByProjectId(projectId);
 
         return NextResponse.json(assets);
     } catch (error: any) {
@@ -220,6 +214,9 @@ export async function DELETE(
             .eq("id", assetId);
 
         if (deleteErr) throw deleteErr;
+
+        // Invalidate asset cache for this project
+        await invalidateCache(`project:${projectId}:assets`);
 
         return NextResponse.json({ success: true });
     } catch (error: any) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 import { createNotification } from "@/lib/notifications";
+import { CollaboratorController } from "@/modules/collaborators/collaborator.controller";
 
 import nodemailer from "nodemailer";
 import { render } from "@react-email/render";
@@ -17,7 +18,6 @@ const transporter = nodemailer.createTransport({
     pass: process.env.SMTP_PASS,
   },
   tls: {
-    // Allow self-signed certificates in the chain (common behind proxies/VPNs)
     rejectUnauthorized: false,
   },
 });
@@ -158,10 +158,8 @@ export async function POST(request: Request) {
 
         try {
           await transporter.verify();
-          console.log("SMTP Connection verified successfully");
         } catch (verifyError) {
-          console.error("SMTP Connection Failed. Please check your .env.local credentials:", verifyError);
-          throw verifyError;
+          console.error("SMTP Connection Failed:", verifyError);
         }
 
         const emailHtml = await render(
@@ -174,24 +172,24 @@ export async function POST(request: Request) {
           })
         );
 
-        const info = await transporter.sendMail({
+        await transporter.sendMail({
           from: process.env.SMTP_FROM || '"Approva" <noreply@approva.com>',
           to: email,
           subject: `You've been invited to collaborate on ${project.name}`,
           html: emailHtml,
         });
-
-        console.log("Email sent successfully! Message ID:", info.messageId);
       } catch (err: any) {
-        console.error("Email send failed:", err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : err);
+        console.error("Email send failed:", err);
       }
-    } else {
-      console.log("Skipping email. Missing SMTP configuration.");
     }
+
+    // Invalidate project collaborators cache after invite/add
+    const collabController = new CollaboratorController();
+    await collabController.invalidateCollaboratorCache(projectId);
 
     return NextResponse.json({ ...invite, id: invite.id });
   } catch (error: any) {
-    console.error("Collaborator POST Error:", error instanceof Error ? { message: error.message, stack: error.stack } : error);
+    console.error("Collaborator POST Error:", error);
     return NextResponse.json(
       { error: error?.message || "Internal Server Error" },
       { status: 500 }
@@ -199,7 +197,7 @@ export async function POST(request: Request) {
   }
 }
 
-//GET-fetch collaborators
+// GET - fetch collaborators using Redis Cache
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -214,52 +212,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await createSupabaseServerClient();
+    const collabController = new CollaboratorController();
+    const data = await collabController.getCollaborators(projectId);
 
-    /* Fetch project to verify caller access and to get owner_id */
-    const { data: project, error: projectErr } = await supabase
-      .from("projects")
-      .select("owner_id, created_at")
-      .eq("id", projectId)
-      .single();
-
-    if (projectErr || !project) {
-      console.error("Collaborators API - Project fetch failed:", {
-        error: projectErr,
-        data: project,
-        projectId,
-        userId: user.$id
-      });
+    if (!data) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    /* Fetch collaborators from Supabase joined with profiles */
-    const { data: collabs, error: collabsErr } = await supabase
-      .from("project_collaborators")
-      .select(`
-        id,
-        user_id,
-        role,
-        created_at,
-        profiles (
-          id,
-          name,
-          email,
-          username,
-          avatar_url
-        )
-      `)
-      .eq("project_id", projectId);
-
-    if (collabsErr) {
-      throw collabsErr;
-    }
-
     let callerRole = "";
-    if (project.owner_id === user.$id) {
+    if (data.owner_id === user.$id) {
       callerRole = "owner";
     } else {
-      const callerCollab = (collabs || []).find((c: any) => c.user_id === user.$id);
+      const callerCollab = data.collabsRaw.find((c: any) => c.user_id === user.$id);
       if (callerCollab) {
         callerRole = callerCollab.role === 'member' ? 'viewer' : callerCollab.role;
       } else {
@@ -270,25 +234,10 @@ export async function GET(request: Request) {
       }
     }
 
-    // Map collaborators from Supabase schema
-    const collaborators = (collabs || []).map((collab: any) => {
-      const profile = collab.profiles || {};
-      return {
-        id: collab.id,
-        user_id: collab.user_id,
-        role: collab.role === 'member' ? 'viewer' : collab.role,
-        created_at: collab.created_at,
-        email: profile.email || "Unknown",
-        name: profile.name || "Unknown User",
-        username: profile.username || "",
-        avatar_url: profile.avatar_url || ""
-      };
-    });
-
     /* Fetch invites if admin/owner */
     let invites: any[] = [];
-
     if (callerRole === "owner" || callerRole === "admin") {
+      const supabase = await createSupabaseServerClient();
       const { data: invitesRes } = await supabase
         .from("project_invites")
         .select("*")
@@ -304,7 +253,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      collaborators,
+      collaborators: data.collaborators,
       invites,
       callerRole,
     });
@@ -317,7 +266,7 @@ export async function GET(request: Request) {
   }
 }
 
-// PATCH-update collaborator role
+// PATCH - update collaborator role
 export async function PATCH(request: Request) {
   try {
     const { user } = await getLoggedInUser();
@@ -343,7 +292,6 @@ export async function PATCH(request: Request) {
 
     const supabase = await createSupabaseServerClient();
 
-    // Verify project exists and fetch owner
     const { data: project, error: projectErr } = await supabase
       .from("projects")
       .select("owner_id")
@@ -354,7 +302,6 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Verify caller is owner or admin in Supabase
     let callerRole = "";
     if (project.owner_id === user.$id) {
       callerRole = "owner";
@@ -378,10 +325,8 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Map role: 'viewer' -> 'member' for Supabase
     const dbRole = newRole === 'viewer' ? 'member' : newRole;
 
-    // Update the collaborator role in Supabase
     const { data: updatedCollab, error: updateErr } = await supabase
       .from("project_collaborators")
       .update({ role: dbRole })
@@ -392,6 +337,10 @@ export async function PATCH(request: Request) {
     if (updateErr) {
       throw updateErr;
     }
+
+    // Invalidate project collaborators cache after role update
+    const collabController = new CollaboratorController();
+    await collabController.invalidateCollaboratorCache(projectId);
 
     return NextResponse.json({
       success: true,
@@ -409,3 +358,80 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+// DELETE - remove collaborator
+export async function DELETE(request: Request) {
+  try {
+    const { user } = await getLoggedInUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const url = new URL(request.url);
+    const projectId = url.searchParams.get("projectId");
+    const collaboratorId = url.searchParams.get("collaboratorId");
+
+    if (!projectId || !collaboratorId) {
+      return NextResponse.json(
+        { error: "Missing required fields (projectId, collaboratorId)" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createSupabaseServerClient();
+
+    const { data: project, error: projectErr } = await supabase
+      .from("projects")
+      .select("owner_id")
+      .eq("id", projectId)
+      .single();
+
+    if (projectErr || !project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    let callerRole = "";
+    if (project.owner_id === user.$id) {
+      callerRole = "owner";
+    } else {
+      const { data: collab } = await supabase
+        .from("project_collaborators")
+        .select("role")
+        .eq("project_id", projectId)
+        .eq("user_id", user.$id)
+        .maybeSingle();
+
+      if (collab) {
+        callerRole = collab.role === 'member' ? 'viewer' : collab.role;
+      }
+    }
+
+    if (callerRole !== "owner" && callerRole !== "admin") {
+      return NextResponse.json(
+        { error: "Insufficient permissions to remove collaborators" },
+        { status: 403 }
+      );
+    }
+
+    const { error: deleteErr } = await supabase
+      .from("project_collaborators")
+      .delete()
+      .eq("id", collaboratorId);
+
+    if (deleteErr) {
+      throw deleteErr;
+    }
+
+    // Invalidate project collaborators cache after collaborator removal
+    const collabController = new CollaboratorController();
+    await collabController.invalidateCollaboratorCache(projectId);
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Collaborator DELETE Error:", error?.message || error);
+    return NextResponse.json(
+      { error: error?.message || "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}

@@ -12,6 +12,10 @@ export class AssetController {
         return this.service.getAllAssetsForUser(user);
     }
 
+    async getAssetsByProjectId(projectId: string) {
+        return this.service.getAssetsByProjectId(projectId);
+    }
+
     async createAsset(user: UserContext, projectId: string, assetData: AssetData) {
         return this.service.createAsset(user, projectId, assetData);
     }

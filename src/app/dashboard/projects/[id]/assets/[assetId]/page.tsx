@@ -150,59 +150,32 @@ export default function AssetDetailPage() {
                 if (assetErr) throw assetErr;
                 setAsset({ ...assetDoc, size: assetDoc.file_size });
 
-                // Fetch Annotations from Supabase
+                // Fetch Annotations from API (Redis Cache)
                 try {
-                    const { data: annDocs, error: annErr } = await supabase
-                        .from("annotations")
-                        .select("*")
-                        .eq("asset_id", assetId)
-                        .neq("status", "resolved");
-
-                    if (annErr) throw annErr;
-
-                    setAnnotations((annDocs || []).map(doc => ({
-                        $id: doc.id,
-                        x: Number(doc.x),
-                        y: Number(doc.y),
-                        width: Number(doc.width),
-                        height: Number(doc.height),
-                        status: doc.status,
-                        name: doc.name || undefined,
-                        color: doc.color || '#a855f7',
-                        user_id: doc.user_id,
-                        created_at: doc.created_at
-                    })));
+                    const jwt = await getJwt();
+                    const annRes = await fetch(`/api/projects/${projectId}/assets/${assetId}/annotations`, {
+                        headers: jwt ? { "Authorization": `Bearer ${jwt}` } : {}
+                    });
+                    if (annRes.ok) {
+                        const annDocs = await annRes.json();
+                        setAnnotations(annDocs);
+                    }
                 } catch (e) {
-                    console.error("Error fetching annotations from Supabase:", e);
+                    console.error("Error fetching annotations from API:", e);
                 }
 
-                // Fetch General Comments from Supabase
+                // Fetch General Comments from API (Redis Cache)
                 try {
-                    const { data: genCommDocs, error: genCommErr } = await supabase
-                        .from("general_comments")
-                        .select(`
-                            *,
-                            profiles (
-                                name,
-                                avatar_url
-                            )
-                        `)
-                        .eq("asset_id", assetId)
-                        .order("created_at", { ascending: true });
-
-                    if (genCommErr) throw genCommErr;
-
-                    setGeneralComments((genCommDocs || []).map(doc => ({
-                        $id: doc.id,
-                        user_id: doc.user_id,
-                        user_email: doc.user_email,
-                        text: doc.text,
-                        created_at: doc.created_at,
-                        mentions: doc.mentions || [],
-                        profiles: doc.profiles
-                    })));
+                    const jwt = await getJwt();
+                    const commRes = await fetch(`/api/projects/${projectId}/assets/${assetId}/comments`, {
+                        headers: jwt ? { "Authorization": `Bearer ${jwt}` } : {}
+                    });
+                    if (commRes.ok) {
+                        const genCommDocs = await commRes.json();
+                        setGeneralComments(genCommDocs);
+                    }
                 } catch (e) {
-                    console.error("Error fetching general comments from Supabase:", e);
+                    console.error("Error fetching general comments from API:", e);
                 }
 
                 // Fetch Versions if they exist
@@ -294,26 +267,24 @@ export default function AssetDetailPage() {
 
     const handleAddAnnotation = async (newAnn: Omit<Annotation, 'created_at' | 'status'>) => {
         try {
-            const { data: doc, error: insertErr } = await supabase
-                .from("annotations")
-                .insert({
-                    asset_id: assetId,
-                    name: newAnn.name || undefined,
-                    x: newAnn.x,
-                    y: newAnn.y,
-                    width: newAnn.width,
-                    height: newAnn.height,
-                    status: 'pending',
-                    color: newAnn.color,
-                    user_id: currentUserId
-                })
-                .select()
-                .single();
+            const jwt = await getJwt();
+            const res = await fetch(`/api/projects/${projectId}/assets/${assetId}/annotations`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(jwt ? { "Authorization": `Bearer ${jwt}` } : {})
+                },
+                body: JSON.stringify(newAnn)
+            });
 
-            if (insertErr) throw insertErr;
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Failed to save annotation");
+            }
 
+            const doc = await res.json();
             const added: Annotation = {
-                $id: doc.id,
+                $id: doc.$id || doc.id,
                 ...newAnn,
                 status: 'pending',
                 created_at: doc.created_at
@@ -321,7 +292,7 @@ export default function AssetDetailPage() {
 
             setAnnotations([...annotations, added]);
             setSelectedAnnotation(added);
-            setComments([]); // New annotation has no comments
+            setComments([]);
 
             // Create Activity Log
             try {
@@ -340,13 +311,7 @@ export default function AssetDetailPage() {
                 console.error("Failed to log annotation activity:", logError);
             }
         } catch (error: any) {
-            console.error("Failed to save annotation in Supabase:", {
-                message: error?.message,
-                details: error?.details,
-                hint: error?.hint,
-                code: error?.code,
-                error
-            });
+            console.error("Failed to save annotation:", error);
             toast.error(`Failed to save annotation: ${error?.message || "Unknown error"}`);
         }
     };
@@ -420,12 +385,20 @@ export default function AssetDetailPage() {
         if (!selectedAnnotation?.$id) return;
 
         try {
-            const { error: updateErr } = await supabase
-                .from("annotations")
-                .update({ status: 'resolved' })
-                .eq("id", selectedAnnotation.$id);
+            const jwt = await getJwt();
+            const res = await fetch(`/api/projects/${projectId}/assets/${assetId}/annotations`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(jwt ? { "Authorization": `Bearer ${jwt}` } : {})
+                },
+                body: JSON.stringify({ annotationId: selectedAnnotation.$id, action: "resolve" })
+            });
 
-            if (updateErr) throw updateErr;
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Failed to resolve annotation");
+            }
 
             // Create Activity Log
             try {
@@ -447,20 +420,12 @@ export default function AssetDetailPage() {
                 console.error("Failed to log resolve activity:", logError);
             }
 
-
-
             setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
             setSelectedAnnotation(null);
             setComments([]);
             toast.success("Annotation approved and removed");
         } catch (e: any) {
-            console.error("Failed to resolve annotation in Supabase:", {
-                message: e?.message,
-                details: e?.details,
-                hint: e?.hint,
-                code: e?.code,
-                e
-            });
+            console.error("Failed to resolve annotation:", e);
             toast.error(`Failed to approve annotation: ${e?.message || "Unknown error"}`);
         }
     };
@@ -469,48 +434,45 @@ export default function AssetDetailPage() {
         if (!selectedAnnotation?.$id) return;
 
         try {
-            const { error: deleteErr } = await supabase
-                .from("annotations")
-                .delete()
-                .eq("id", selectedAnnotation.$id);
+            const jwt = await getJwt();
+            const res = await fetch(`/api/projects/${projectId}/assets/${assetId}/annotations?annotationId=${selectedAnnotation.$id}`, {
+                method: "DELETE",
+                headers: jwt ? { "Authorization": `Bearer ${jwt}` } : {}
+            });
 
-            if (deleteErr) throw deleteErr;
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Failed to delete annotation");
+            }
 
             setAnnotations(annotations.filter(a => a.$id !== selectedAnnotation.$id));
             setSelectedAnnotation(null);
             setComments([]); // Clear comments
             toast.success("Annotation deleted successfully");
         } catch (e: any) {
-            console.error("Failed to delete annotation in Supabase:", {
-                message: e?.message,
-                details: e?.details,
-                hint: e?.hint,
-                code: e?.code,
-                e
-            });
+            console.error("Failed to delete annotation:", e);
             toast.error(`Failed to delete annotation: ${e?.message || "Unknown error"}`);
         }
     };
 
     const handleDeleteComment = async (commentId: string) => {
         try {
-            const { error: deleteErr } = await supabase
-                .from("comments")
-                .delete()
-                .eq("id", commentId);
+            const jwt = await getJwt();
+            const res = await fetch(`/api/projects/${projectId}/assets/${assetId}/comments?commentId=${commentId}`, {
+                method: "DELETE",
+                headers: jwt ? { "Authorization": `Bearer ${jwt}` } : {}
+            });
 
-            if (deleteErr) throw deleteErr;
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Failed to delete comment");
+            }
 
+            setGeneralComments(generalComments.filter(c => c.$id !== commentId && (c as any).id !== commentId));
             setComments(comments.filter(c => c.$id !== commentId));
             toast.success("Comment deleted successfully");
         } catch (e: any) {
-            console.error("Failed to delete comment in Supabase:", {
-                message: e?.message,
-                details: e?.details,
-                hint: e?.hint,
-                code: e?.code,
-                e
-            });
+            console.error("Failed to delete comment:", e);
             toast.error(`Failed to delete comment: ${e?.message || "Unknown error"}`);
         }
     };
@@ -526,34 +488,34 @@ export default function AssetDetailPage() {
         });
 
         try {
-            const { data: doc, error: insertErr } = await supabase
-                .from("general_comments")
-                .insert({
-                    asset_id: assetId,
-                    user_id: currentUserId,
-                    user_email: userEmail,
+            const jwt = await getJwt();
+            const res = await fetch(`/api/projects/${projectId}/assets/${assetId}/comments`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(jwt ? { "Authorization": `Bearer ${jwt}` } : {})
+                },
+                body: JSON.stringify({
                     text: submitText,
                     mentions: generalMentionedUserIds
                 })
-                .select(`
-                    *,
-                    profiles (
-                        name,
-                        avatar_url
-                    )
-                `)
-                .single();
+            });
 
-            if (insertErr) throw insertErr;
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "Failed to send comment");
+            }
+
+            const doc = await res.json();
 
             setGeneralComments([...generalComments, {
-                $id: doc.id,
+                $id: doc.id || doc.$id,
                 user_id: currentUserId,
                 user_email: userEmail,
                 text: submitText,
                 created_at: doc.created_at,
                 mentions: generalMentionedUserIds,
-                profiles: doc.profiles
+                profiles: doc.profiles || currentUserProfile
             } as any]);
 
             // Fire mention notifications (fire-and-forget)

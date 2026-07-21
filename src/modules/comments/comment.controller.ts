@@ -7,7 +7,19 @@ export class CommentController {
         this.service = new CommentService();
     }
 
-    async createGeneralComment(assetId: string, userId: string, userEmail: string, text: string) {
-        return this.service.createGeneralComment(assetId, userId, userEmail, text);
+    async getCommentsByAssetId(assetId: string) {
+        return this.service.getCommentsByAssetId(assetId);
+    }
+
+    async createGeneralComment(assetId: string, userId: string, userEmail: string, text: string, mentions: string[] = []) {
+        return this.service.createGeneralComment(assetId, userId, userEmail, text, mentions);
+    }
+
+    async updateComment(assetId: string, commentId: string, text: string) {
+        return this.service.updateComment(assetId, commentId, text);
+    }
+
+    async deleteComment(assetId: string, commentId: string) {
+        return this.service.deleteComment(assetId, commentId);
     }
 }
