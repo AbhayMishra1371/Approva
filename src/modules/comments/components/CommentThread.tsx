@@ -60,58 +60,144 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
     role,
     collaborators = []
 }) => {
-    const [newComment, setNewComment] = useState("");
     const [mentionSearch, setMentionSearch] = useState("");
     const [showMentions, setShowMentions] = useState(false);
     const [mentionIndex, setMentionIndex] = useState(-1);
     const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
-    // Map of display-name -> userId for mentions inserted in this comment
-    const [mentionedUsers, setMentionedUsers] = useState<Array<{ name: string; userId: string }>>([]);
+
+    const inputRef = React.useRef<HTMLDivElement>(null);
+    const savedRangeRef = React.useRef<Range | null>(null);
+    const [isEmpty, setIsEmpty] = useState(true);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newComment.trim()) return;
-        // Convert display names to @[Name](UUID) storage format
-        let submitText = newComment;
-        mentionedUsers.forEach(({ name, userId }) => {
-            submitText = submitText.replace(name, `@[${name}](${userId})`);
+        if (!inputRef.current) return;
+
+        // Parse child nodes to convert mention spans into @[Name](userId)
+        let submitText = "";
+        const childNodes = inputRef.current.childNodes;
+        const submitUserIds: string[] = [];
+
+        childNodes.forEach(node => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                submitText += node.textContent;
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                const el = node as HTMLElement;
+                if (el.tagName === "SPAN" && el.getAttribute("data-user-id")) {
+                    const userId = el.getAttribute("data-user-id")!;
+                    const name = el.getAttribute("data-name")!;
+                    submitText += `@[${name}](${userId})`;
+                    if (!submitUserIds.includes(userId)) {
+                        submitUserIds.push(userId);
+                    }
+                } else {
+                    submitText += el.innerText;
+                }
+            }
         });
-        onAddComment(submitText, mentionedUserIds);
-        setNewComment("");
+
+        if (!submitText.trim()) return;
+
+        onAddComment(submitText, submitUserIds);
+
+        // Clear the input
+        inputRef.current.innerHTML = "";
         setMentionedUserIds([]);
-        setMentionedUsers([]);
+        setIsEmpty(true);
+        setShowMentions(false);
     };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const value = e.target.value;
-        const cursorPosition = e.target.selectionStart || 0;
-        const textBeforeCursor = value.substring(0, cursorPosition);
+    const handleInputChange = () => {
+        if (!inputRef.current) return;
+        const text = inputRef.current.innerText || "";
+        setIsEmpty(text.trim() === "");
 
-        const mentionMatch = textBeforeCursor.match(/(?:^|\s)@(\w*)$/);
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            savedRangeRef.current = range.cloneRange();
 
-        if (mentionMatch) {
-            setShowMentions(true);
-            setMentionSearch(mentionMatch[1]);
-            setMentionIndex(textBeforeCursor.lastIndexOf('@'));
-        } else {
-            setShowMentions(false);
+            const textNode = range.startContainer;
+            if (textNode.nodeType === Node.TEXT_NODE) {
+                const offset = range.startOffset;
+                const textBeforeCursor = textNode.textContent?.substring(0, offset) || "";
+                const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+                if (mentionMatch) {
+                    setShowMentions(true);
+                    setMentionSearch(mentionMatch[1]);
+                    setMentionIndex(textBeforeCursor.lastIndexOf('@'));
+                    return;
+                }
+            }
         }
+        setShowMentions(false);
+    };
 
-        setNewComment(value);
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit(e);
+        }
     };
 
     const insertMention = (user: any) => {
-        const beforeMention = newComment.substring(0, mentionIndex);
-        const afterMention = newComment.substring(mentionIndex + mentionSearch.length + 1);
-        // Show just the name in the input field
-        const updatedComment = `${beforeMention}${user.name} ${afterMention}`;
-        setNewComment(updatedComment);
+        if (!inputRef.current) return;
+        inputRef.current.focus();
+
+        const selection = window.getSelection();
+        let range = savedRangeRef.current;
+
+        if (!range && selection && selection.rangeCount > 0) {
+            range = selection.getRangeAt(0);
+        }
+
+        if (range) {
+            const textNode = range.startContainer;
+            if (textNode.nodeType === Node.TEXT_NODE) {
+                const offset = range.startOffset;
+                // Go back to find the '@' symbol and delete it along with search term
+                const start = Math.max(0, offset - mentionSearch.length - 1);
+                range.setStart(textNode, start);
+                range.deleteContents();
+            }
+
+            const span = document.createElement("span");
+            span.contentEditable = "false";
+            span.className = "bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded mx-0.5 inline-block font-semibold text-xs";
+            span.setAttribute("data-user-id", user.user_id);
+            span.setAttribute("data-name", user.name);
+            span.innerText = user.name; // NO @ symbol in the input box!
+
+            range.insertNode(span);
+
+            // Insert a space after
+            const space = document.createTextNode("\u00a0");
+            range.collapse(false);
+            range.insertNode(space);
+
+            range.setStartAfter(space);
+            range.setEndAfter(space);
+            if (selection) {
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        } else {
+            const span = document.createElement("span");
+            span.contentEditable = "false";
+            span.className = "bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded mx-0.5 inline-block font-semibold text-xs";
+            span.setAttribute("data-user-id", user.user_id);
+            span.setAttribute("data-name", user.name);
+            span.innerText = user.name;
+
+            inputRef.current.appendChild(span);
+            inputRef.current.appendChild(document.createTextNode("\u00a0"));
+        }
+
         setShowMentions(false);
+        setIsEmpty(false);
         if (!mentionedUserIds.includes(user.user_id)) {
             setMentionedUserIds([...mentionedUserIds, user.user_id]);
         }
-        // Track name -> userId mapping for submit conversion
-        setMentionedUsers(prev => [...prev, { name: user.name, userId: user.user_id }]);
     };
 
     const filteredCollaborators = collaborators.filter(c => {
@@ -167,11 +253,13 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
         if (patterns.length === 0) return <>{text}</>;
 
         patterns.sort((a, b) => b.length - a.length);
-        const regex = new RegExp(`(${patterns.join('|')})`, 'g');
+        // Match name optionally preceded by @
+        const regex = new RegExp(`(@?(?:${patterns.join('|')}))`, 'g');
         const parts = text.split(regex);
 
         return parts.map((part, index) => {
-            const collaborator = (collaborators || []).find(c => c.name === part);
+            const cleanPart = part.startsWith('@') ? part.substring(1) : part;
+            const collaborator = (collaborators || []).find(c => c.name === cleanPart);
             if (collaborator) {
                 return (
                     <Link
@@ -179,7 +267,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                         href={`/dashboard/profile/${collaborator.user_id}`}
                         className="text-purple-400 font-bold hover:underline cursor-pointer"
                     >
-                        {part}
+                        {cleanPart}
                     </Link>
                 );
             }
@@ -340,6 +428,7 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                                     <button
                                         key={collab.user_id}
                                         type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => insertMention(collab)}
                                         className="w-full flex items-center gap-3 p-3 hover:bg-purple-500/10 transition-colors text-left border-b border-[#2a2b36]/50 last:border-0"
                                     >
@@ -360,30 +449,23 @@ export const CommentThread: React.FC<CommentThreadProps> = ({
                         </div>
                     )}
                     <form onSubmit={handleSubmit} className="relative">
-                        {/* Mention chips: visual preview of inserted mentions */}
-                        {mentionedUsers.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-2">
-                                {mentionedUsers.map((u, i) => (
-                                    <span
-                                        key={i}
-                                        className="inline-flex items-center gap-1 bg-purple-500/20 text-purple-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-purple-500/30"
-                                    >
-                                        @{u.name}
-                                    </span>
-                                ))}
+                        {isEmpty && (
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-600 pointer-events-none">
+                                Write a comment... (@mention)
                             </div>
                         )}
-                        <input
-                            type="text"
-                            placeholder="Write a comment... (@mention)"
-                            className="w-full bg-[#12131a] border border-[#2a2b36] rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-purple-500 transition-colors"
-                            value={newComment}
-                            onChange={handleInputChange}
+                        <div
+                            ref={inputRef}
+                            contentEditable={!readOnly}
+                            onInput={handleInputChange}
+                            onKeyDown={handleKeyDown}
+                            className="w-full bg-[#12131a] border border-[#2a2b36] rounded-xl pl-4 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500 transition-colors min-h-[40px] max-h-24 overflow-y-auto cursor-text"
+                            style={{ outline: 'none', wordBreak: 'break-word', cursor: 'text' }}
                         />
                         <button
                             type="submit"
-                            disabled={!newComment.trim()}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-purple-500 hover:text-purple-400 disabled:text-slate-600 transition-colors"
+                            disabled={isEmpty}
+                            className="absolute right-2 bottom-1.5 p-1.5 text-purple-500 hover:text-purple-400 disabled:text-slate-600 transition-colors"
                         >
                             <Send className="w-4 h-4" />
                         </button>
