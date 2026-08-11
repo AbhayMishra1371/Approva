@@ -4,7 +4,12 @@ export class CommentRepository {
     constructor() {}
 
     async getCommentsByAssetId(assetId: string) {
+        console.time("COMMENTS TOTAL");
+        console.time("SUPABASE CLIENT [COMMENTS]");
         const supabase = await createSupabaseServerClient();
+        console.timeEnd("SUPABASE CLIENT [COMMENTS]");
+
+        console.time("SUPABASE QUERY [COMMENTS]");
         const { data, error } = await supabase
             .from("general_comments")
             .select(`
@@ -16,6 +21,8 @@ export class CommentRepository {
             `)
             .eq("asset_id", assetId)
             .order("created_at", { ascending: true });
+        console.timeEnd("SUPABASE QUERY [COMMENTS]");
+        console.timeEnd("COMMENTS TOTAL");
 
         if (error) {
             console.error("Error fetching general comments:", error);

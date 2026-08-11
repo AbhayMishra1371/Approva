@@ -2,12 +2,19 @@ import { createClient as createSupabaseServerClient } from "@/lib/supabase/serve
 
 export class AnnotationRepository {
     async getAnnotationsByAssetId(assetId: string) {
+        console.time("ANNOTATIONS TOTAL");
+        console.time("SUPABASE CLIENT [ANNOTATIONS]");
         const supabase = await createSupabaseServerClient();
+        console.timeEnd("SUPABASE CLIENT [ANNOTATIONS]");
+
+        console.time("SUPABASE QUERY [ANNOTATIONS]");
         const { data: annDocs, error: annErr } = await supabase
             .from("annotations")
             .select("*")
             .eq("asset_id", assetId)
             .neq("status", "resolved");
+        console.timeEnd("SUPABASE QUERY [ANNOTATIONS]");
+        console.timeEnd("ANNOTATIONS TOTAL");
 
         if (annErr) {
             console.error("Error fetching annotations from Supabase:", annErr);
