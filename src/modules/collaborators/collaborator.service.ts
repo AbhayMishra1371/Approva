@@ -10,7 +10,7 @@ export class CollaboratorService {
 
     async getCollaborators(projectId: string) {
         const cacheKey = `project:${projectId}:collaborators`;
-        return getOrSetCache(cacheKey, 3600, () => this.repository.getCollaboratorsByProjectId(projectId));
+        return getOrSetCache(cacheKey, 1800, () => this.repository.getCollaboratorsByProjectId(projectId));
     }
 
     async invalidateCollaboratorCache(projectId: string) {

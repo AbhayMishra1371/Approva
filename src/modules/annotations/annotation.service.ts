@@ -10,7 +10,7 @@ export class AnnotationService {
 
     async getAnnotationsByAssetId(assetId: string) {
         const cacheKey = `asset:${assetId}:annotations`;
-        return getOrSetCache(cacheKey, 300, () => this.repository.getAnnotationsByAssetId(assetId));
+        return getOrSetCache(cacheKey, 120, () => this.repository.getAnnotationsByAssetId(assetId));
     }
 
     async createAnnotation(assetId: string, userId: string, data: any) {

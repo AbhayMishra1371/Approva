@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLoggedInUser, createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 import { createNotification, NotificationType } from "@/lib/notifications";
+import { getOrSetCache, invalidateCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -45,17 +46,21 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", user.$id)
-      .order("created_at", { ascending: false })
-      .limit(50);
+    const cacheKey = `user:${user.$id}:notifications`;
+    const notifications = await getOrSetCache(cacheKey, 45, async () => {
+      const supabase = await createSupabaseServerClient();
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.$id)
+        .order("created_at", { ascending: false })
+        .limit(50);
 
-    if (error) throw error;
+      if (error) throw error;
+      return data ?? [];
+    });
 
-    return NextResponse.json({ notifications: data ?? [] });
+    return NextResponse.json({ notifications });
   } catch (error: any) {
     console.error("GET /api/notifications error:", error?.message);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -85,6 +90,7 @@ export async function PATCH(request: Request) {
         .eq("is_read", false);
 
       if (error) throw error;
+      await invalidateCache(`user:${user.$id}:notifications`);
       return NextResponse.json({ success: true });
     }
 
@@ -96,6 +102,7 @@ export async function PATCH(request: Request) {
         .eq("user_id", user.$id); // ensure ownership
 
       if (error) throw error;
+      await invalidateCache(`user:${user.$id}:notifications`);
       return NextResponse.json({ success: true });
     }
 

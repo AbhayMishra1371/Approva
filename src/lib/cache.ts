@@ -18,12 +18,14 @@ export async function getOrSetCache<T>(
 
     const data = await fetcher();
 
-    try {
-        await redis.set(key, data, {
-            ex: ttl,
-        });
-    } catch (error) {
-        console.warn(`[Redis Cache Write Error] Key: ${key}`, error);
+    if (data !== undefined && data !== null) {
+        try {
+            await redis.set(key, data, {
+                ex: ttl,
+            });
+        } catch (error) {
+            console.warn(`[Redis Cache Write Error] Key: ${key}`, error);
+        }
     }
 
     return data;

@@ -1,4 +1,5 @@
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+import { invalidateCache } from "@/lib/cache";
 
 export type NotificationType =
   | "mention"
@@ -39,6 +40,8 @@ export async function createNotification(payload: CreateNotificationPayload) {
     });
     if (error) {
       console.error("[notifications] Failed to insert notification:", error.message);
+    } else {
+      await invalidateCache(`user:${payload.user_id}:notifications`);
     }
   } catch (err: any) {
     console.error("[notifications] Unexpected error creating notification:", err?.message ?? err);
