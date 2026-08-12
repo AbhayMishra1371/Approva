@@ -232,7 +232,213 @@ export default function AssetDetailPage() {
         }
     }, [projectId]);
 
+    // Supabase Realtime Subscriptions
+    useEffect(() => {
+        if (!assetId) return;
 
+        // 1. Subscribe to Annotations Realtime Events
+        const annotationsChannel = supabase
+            .channel(`asset-annotations-${assetId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "annotations",
+                    filter: `asset_id=eq.${assetId}`,
+                },
+                (payload) => {
+                    if (payload.eventType === "INSERT") {
+                        const newAnn = payload.new as any;
+                        setAnnotations((current) => {
+                            if (current.some(a => a.$id === newAnn.id)) return current;
+                            return [...current, { ...newAnn, $id: newAnn.id } as any];
+                        });
+                    } else if (payload.eventType === "UPDATE") {
+                        const updatedAnn = payload.new as any;
+                        setAnnotations((current) =>
+                            current.map((ann) =>
+                                (ann.$id === updatedAnn.id)
+                                    ? { ...ann, ...updatedAnn, $id: updatedAnn.id } as any
+                                    : ann
+                            )
+                        );
+                        setSelectedAnnotation((current) => {
+                            if (current && current.$id === updatedAnn.id) {
+                                return { ...current, ...updatedAnn, $id: updatedAnn.id } as any;
+                            }
+                            return current;
+                        });
+                    } else if (payload.eventType === "DELETE") {
+                        const deletedId = payload.old.id;
+                        setAnnotations((current) =>
+                            current.filter((ann) => ann.$id !== deletedId)
+                        );
+                        setSelectedAnnotation((current) => {
+                            if (current && current.$id === deletedId) {
+                                return null;
+                            }
+                            return current;
+                        });
+                    }
+                }
+            )
+            .subscribe();
+
+        // 2. Subscribe to General Comments Realtime Events
+        const generalCommentsChannel = supabase
+            .channel(`asset-general-comments-${assetId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "general_comments",
+                    filter: `asset_id=eq.${assetId}`,
+                },
+                async (payload) => {
+                    if (payload.eventType === "INSERT") {
+                        const newComment = payload.new as any;
+                        // Fetch profiles join dynamically
+                        const { data: profile } = await supabase
+                            .from("profiles")
+                            .select("name, avatar_url")
+                            .eq("id", newComment.user_id)
+                            .single();
+
+                        setGeneralComments((current) => {
+                            if (current.some(c => c.$id === newComment.id || (c as any).id === newComment.id)) return current;
+                            return [
+                                ...current,
+                                {
+                                    $id: newComment.id,
+                                    id: newComment.id,
+                                    user_id: newComment.user_id,
+                                    user_email: newComment.user_email,
+                                    text: newComment.text,
+                                    created_at: newComment.created_at,
+                                    mentions: newComment.mentions || [],
+                                    profiles: profile
+                                } as any
+                            ];
+                        });
+                    } else if (payload.eventType === "UPDATE") {
+                        const updatedComment = payload.new as any;
+                        setGeneralComments((current) =>
+                            current.map((c) =>
+                                (c.$id === updatedComment.id || (c as any).id === updatedComment.id)
+                                    ? { ...c, text: updatedComment.text }
+                                    : c
+                            )
+                        );
+                    } else if (payload.eventType === "DELETE") {
+                        const deletedId = payload.old.id;
+                        setGeneralComments((current) =>
+                            current.filter((c) => c.$id !== deletedId && (c as any).id !== deletedId)
+                        );
+                    }
+                }
+            )
+            .subscribe();
+
+        // 3. Subscribe to Asset Updates Realtime Events (e.g. status updates)
+        const assetStatusChannel = supabase
+            .channel(`asset-status-${assetId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "UPDATE",
+                    schema: "public",
+                    table: "assets",
+                    filter: `id=eq.${assetId}`,
+                },
+                (payload) => {
+                    const updatedAsset = payload.new as Asset;
+                    setAsset((current) => {
+                        if (current) {
+                           return {
+                               ...current,
+                               status: updatedAsset.status
+                           };
+                        }
+                        return current;
+                    });
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(annotationsChannel);
+            supabase.removeChannel(generalCommentsChannel);
+            supabase.removeChannel(assetStatusChannel);
+        };
+    }, [assetId, supabase]);
+
+    // 4. Subscribe to Annotation Comments Realtime Events when an annotation is selected
+    useEffect(() => {
+        const annotationId = selectedAnnotation?.$id;
+        if (!annotationId) {
+            setComments([]);
+            return;
+        }
+
+        const commentsChannel = supabase
+            .channel(`annotation-comments-${annotationId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "comments",
+                    filter: `annotation_id=eq.${annotationId}`,
+                },
+                async (payload) => {
+                    if (payload.eventType === "INSERT") {
+                        const newComment = payload.new as any;
+                        const { data: profile } = await supabase
+                            .from("profiles")
+                            .select("name, avatar_url")
+                            .eq("id", newComment.user_id)
+                            .single();
+
+                        setComments((current) => {
+                            if (current.some(c => c.$id === newComment.id)) return current;
+                            return [
+                                ...current,
+                                {
+                                    $id: newComment.id,
+                                    user_id: newComment.user_id,
+                                    user_email: newComment.user_email,
+                                    text: newComment.text,
+                                    created_at: newComment.created_at,
+                                    mentions: newComment.mentions || [],
+                                    profiles: profile
+                                } as any
+                            ];
+                        });
+                    } else if (payload.eventType === "UPDATE") {
+                        const updatedComment = payload.new as any;
+                        setComments((current) =>
+                            current.map((c) =>
+                                c.$id === updatedComment.id
+                                    ? { ...c, text: updatedComment.text }
+                                    : c
+                            )
+                        );
+                    } else if (payload.eventType === "DELETE") {
+                        const deletedId = payload.old.id;
+                        setComments((current) =>
+                            current.filter((c) => c.$id !== deletedId)
+                        );
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(commentsChannel);
+        };
+    }, [selectedAnnotation, supabase]);
 
     const fetchComments = async (annotationId: string) => {
         try {
